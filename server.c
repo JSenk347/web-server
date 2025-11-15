@@ -39,10 +39,7 @@ int welcome_socket(uint16_t port)
     char buffer[BUFFER_SIZE] = {0}; // buffer for incoming data from clients
     ssize_t bytes_read; // amnt of bytes read from client
 
-    if (create_wel_socket(&serverfd) < 0)
-    {
-        return -1;
-    }
+    if (create_wel_socket(&serverfd) < 0) return -1;
 
     if (set_socket_opt(serverfd) < 0) // passing by value bc we don't need to modify serverfd in caller
     {
@@ -50,15 +47,8 @@ int welcome_socket(uint16_t port)
         return -1;
     }
 
-    memset(&server_addr, 0, server_addr_len); // wipes any garbo from the server_addr structure, filling &server_addr with 0 for sizeof(server_addr) bytes
-    server_addr.sin_family = AF_INET;             // Specifies the server address TYPE to IPv4
-    server_addr.sin_addr.s_addr = INADDR_ANY;     // Listen on all interfaces -> any of the machines IP addresses. INDADDR_ANY resolves to 0.0.0.0
-    server_addr.sin_port = htons(port);           // Set port number
-
-    // Bind the socket to the address and port -> reserves this port and IP addr for this socket
-    if (bind(serverfd, (struct sockaddr *)&server_addr, server_addr_len) < 0)
+    if (bind_socket(serverfd, port, &server_addr, server_addr_len) < 0)
     {
-        perror("\nwelcome socket binding failed");
         close(serverfd);
         return -1;
     }
@@ -139,6 +129,35 @@ int set_socket_opt(int serverfd)
         return -1;
     }
     return 0;
+}
+
+/**
+ * @brief Binds the server socket to the specified port and address.
+ * 
+ * @param serverfd The server socket file descriptor.
+ * @param port The port number to bind the socket to.
+ * @param server_addr Pointer to the sockaddr_in structure to hold the server address.
+ * @param server_addr_len The length of the server_addr structure.
+ * @return 0 on success, -1 on failure.
+ */
+int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
+    socklen_t server_addr_len)
+{
+    /* wipes any garbo from the server_addr structure, filling &server_addr
+       with 0 for sizeof(server_addr) bytes */
+    memset(server_addr, 0, server_addr_len);
+
+    server_addr->sin_family = AF_INET;             // Specifies the server address TYPE to IPv4
+    server_addr->sin_addr.s_addr = INADDR_ANY;     // Listen on all interfaces -> any of the machines IP addresses. INDADDR_ANY resolves to 0.0.0.0
+    server_addr->sin_port = htons(port);           // Set port number
+
+    // Bind the socket to the address and port -> reserves this port and IP addr for this socket
+    if (bind(serverfd, (struct sockaddr *)server_addr, server_addr_len) < 0)
+    {
+        perror("\nwelcome socket binding failed");
+        close(serverfd);
+        return -1;
+    }
 }
 
 /**

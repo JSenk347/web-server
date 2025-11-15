@@ -19,6 +19,8 @@
 int welcome_socket(uint16_t port);
 int create_wel_socket(int *serverfd);
 int set_socket_opt(int serverfd);
+int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
+    socklen_t server_addr_len);
 void thread_pool();
 void* worker_function(void* arg);
 int deq();
