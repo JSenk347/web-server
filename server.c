@@ -1,9 +1,8 @@
 /**
  * Summary: Simple TCP server 'main' function to set up sockets
  *
- * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
- *
  * @file server.c
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
  */
 
 #include "server.h"
@@ -45,9 +44,11 @@ int welcome_socket(uint16_t port)
         return -1;
     }
 
-    // Set address/port reusable (optional, for quick restarts)
-    int opt = 1;
-    setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if (set_socket_opt(serverfd) < 0) // passing by value bc we don't need to modify serverfd in caller
+    {
+        close(serverfd);
+        return -1;
+    }
 
     memset(&server_addr, 0, server_addr_len); // wipes any garbo from the server_addr structure, filling &server_addr with 0 for sizeof(server_addr) bytes
     server_addr.sin_family = AF_INET;             // Specifies the server address TYPE to IPv4
@@ -117,6 +118,26 @@ int create_wel_socket(int *serverfd)
         return -1;
     }
 
+    return 0;
+}
+
+/**
+ * @brief Sets socket options for the given server socket file descriptor.
+ *
+ * @param serverfd The server socket file descriptor.
+ * @return 0 on success, -1 on failure.
+ */
+int set_socket_opt(int serverfd)
+{
+    // Set address/port reusable (optional, for quick restarts)
+    int opt = 1;
+    
+    if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+    {
+        // Error check setsockopt failure
+        perror("\nsetsockopt failed");
+        return -1;
+    }
     return 0;
 }
 
