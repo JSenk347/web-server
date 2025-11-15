@@ -41,7 +41,7 @@ int welcome_socket(uint16_t port)
 
     if (create_wel_socket(&serverfd) < 0) return -1;
 
-    if (set_socket_opt(serverfd) < 0) // passing by value bc we don't need to modify serverfd in caller
+    if (set_socket_opt(serverfd) < 0)
     {
         close(serverfd);
         return -1;
@@ -53,10 +53,8 @@ int welcome_socket(uint16_t port)
         return -1;
     }
 
-    // Listen for incoming connections (max 5 in the queue)
-    if (listen(serverfd, NUM_CONNECTIONS) < 0)
+    if (start_listening(serverfd) < 0)
     {
-        perror("\nwelcome socket listening failed");
         close(serverfd);
         return -1;
     }
@@ -158,6 +156,24 @@ int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
         close(serverfd);
         return -1;
     }
+}
+
+/**
+ * @brief Starts listening for incoming connections on the server socket.
+ * 
+ * @param serverfd The server socket file descriptor.
+ * @return 0 on success, -1 on failure.
+ */
+int start_listening(int serverfd)
+{
+    // Listen for incoming connections (max 5 in the queue)
+    if (listen(serverfd, NUM_CONNECTIONS) < 0)
+    {
+        perror("\nwelcome socket listening failed");
+        close(serverfd);
+        return -1;
+    }
+    return 0;
 }
 
 /**

@@ -21,6 +21,7 @@ int create_wel_socket(int *serverfd);
 int set_socket_opt(int serverfd);
 int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
     socklen_t server_addr_len);
+int start_listening(int serverfd);
 void thread_pool();
 void* worker_function(void* arg);
 int deq();
