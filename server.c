@@ -33,11 +33,9 @@ int main()
  */
 int welcome_socket(uint16_t port)
 {
-    int serverfd, incoming_socketfd;
+    int serverfd;
     struct sockaddr_in server_addr;
     socklen_t server_addr_len = sizeof(server_addr);
-    char buffer[BUFFER_SIZE] = {0}; // buffer for incoming data from clients
-    ssize_t bytes_read; // amnt of bytes read from client
 
     if (create_wel_socket(&serverfd) < 0) return -1;
 
@@ -59,25 +57,12 @@ int welcome_socket(uint16_t port)
         return -1;
     }
 
-    // creating a new socket for an incoming ping. program WAITS for incoming request
-    if ((incoming_socketfd = accept(serverfd, (struct sockaddr*)&server_addr, &server_addr_len)) < 0){ // accept() creates new socket specifically for this client
-        perror("accept failed");
+    if (handle_client(serverfd, &server_addr, server_addr_len) < 0)
+    {
         close(serverfd);
         return -1;
     }
 
-    bytes_read = recv(incoming_socketfd, buffer, BUFFER_SIZE - 1, 0);
-    if(bytes_read < 0){
-        perror("recv failed");
-    } else if (bytes_read == 0){
-        printf("client disconnected");
-    } else {
-        buffer[bytes_read] = '\0'; // null terminate what's in buffer so we can treat it as a c-string
-        printf("client message: \n%s\n", buffer);
-    }
-    close(incoming_socketfd);
-
-    //socket_to_string(serverfd, server_addr); // TESTING
     return serverfd; // Returns the file descriptor of the socket
 }
 
@@ -156,6 +141,7 @@ int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
         close(serverfd);
         return -1;
     }
+    return 0;
 }
 
 /**
@@ -173,6 +159,51 @@ int start_listening(int serverfd)
         close(serverfd);
         return -1;
     }
+    return 0;
+}
+
+/**
+ * @brief Handles incoming client connections on the server socket.
+ * 
+ * @param serverfd The server socket file descriptor.
+ * @param server_addr Pointer to the sockaddr_in structure holding the server address.
+ * @param server_addr_len The length of the server_addr structure.
+ * @return 0 on success, -1 on failure.
+ */
+int handle_client(int serverfd, struct sockaddr_in *server_addr,
+    socklen_t server_addr_len)
+{
+    int incoming_socketfd;
+    char buffer[BUFFER_SIZE] = {0}; // buffer for incoming data from clients
+    ssize_t bytes_read; // amnt of bytes read from client
+    
+    // creating a new socket for an incoming ping. program WAITS for incoming request
+    // accept() creates new socket specifically for this client
+    if ((incoming_socketfd = accept(serverfd, (struct sockaddr*)server_addr,
+        &server_addr_len)) < 0)
+    { 
+        perror("accept failed");
+        close(serverfd);
+        return -1;
+    }
+
+    bytes_read = recv(incoming_socketfd, buffer, BUFFER_SIZE - 1, 0);
+    if(bytes_read < 0)
+    {
+        perror("recv failed");
+    } else if (bytes_read == 0)
+    {
+        printf("client disconnected");
+    } else
+    {
+        // null terminate what's in buffer so we can treat it as a c-string
+        buffer[bytes_read] = '\0';
+        printf("client message: \n%s\n", buffer);
+    }
+    close(incoming_socketfd);
+
+    //socket_to_string(serverfd, server_addr); // TESTING
+    
     return 0;
 }
 
