@@ -17,6 +17,7 @@
 #include <semaphore.h>
 
 int welcome_socket(uint16_t port);
+int create_wel_socket(int *serverfd);
 void thread_pool();
 void* worker_function(void* arg);
 int deq();

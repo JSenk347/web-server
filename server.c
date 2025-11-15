@@ -40,13 +40,8 @@ int welcome_socket(uint16_t port)
     char buffer[BUFFER_SIZE] = {0}; // buffer for incoming data from clients
     ssize_t bytes_read; // amnt of bytes read from client
 
-    // Create the socket (IPv4, TCP)
-    serverfd = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Use IPv4; SOCK_STREAM = specifies stream socket type who's default protocol is TCP
-
-    /* error checking if socket creation failed */
-    if (serverfd < 0)
+    if (create_wel_socket(&serverfd) < 0)
     {
-        perror("\nwelcome socket creation failed");
         return -1;
     }
 
@@ -95,6 +90,34 @@ int welcome_socket(uint16_t port)
 
     //socket_to_string(serverfd, server_addr); // TESTING
     return serverfd; // Returns the file descriptor of the socket
+}
+
+/**
+ * @brief Creates a TCP welcome socket. Prints error message on failure.
+ *
+ * @param serverfd Pointer to an integer where the created socket file descriptor will be stored.
+ * @return 0 on success, -1 on failure.
+ */
+int create_wel_socket(int *serverfd)
+{
+    // Validate input pointer
+    if (serverfd == NULL)
+    {
+        fprintf(stderr, "Invalid pointer passed to create_wel_socket\n");
+        return -1;
+    }
+
+    // Create the socket (IPv4, TCP)
+    *serverfd = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Use IPv4; SOCK_STREAM = specifies stream socket type who's default protocol is TCP
+
+    // Error check socket creation failure
+    if (*serverfd < 0)
+    {
+        perror("\nwelcome socket creation failed");
+        return -1;
+    }
+
+    return 0;
 }
 
 /**
