@@ -186,21 +186,13 @@ int handle_client(int serverfd, struct sockaddr_in *server_addr,
         return -1;
     }
 
-    ssize_t bytes_read; // amnt of bytes read from client
-
-    bytes_read = recv(incoming_socketfd, buffer, BUFFER_SIZE - 1, 0);
-    if(bytes_read < 0)
+    if (recieve_message(incoming_socketfd, buffer) < 0)
     {
-        perror("recv failed");
-    } else if (bytes_read == 0)
-    {
-        printf("client disconnected");
-    } else
-    {
-        // null terminate what's in buffer so we can treat it as a c-string
-        buffer[bytes_read] = '\0';
-        printf("client message: \n%s\n", buffer);
+        close(incoming_socketfd);
+        close(serverfd);
+        return -1;
     }
+
     close(incoming_socketfd);
 
     //socket_to_string(serverfd, server_addr); // TESTING
@@ -236,6 +228,35 @@ int accept_client(int serverfd, int *clientfd, struct sockaddr_in *server_addr,
     }
     return 0;
 }   
+
+/**
+ * @brief Receives a message from the client socket.
+ * 
+ * @param clientfd The client socket file descriptor.
+ * @param buffer Pointer to the buffer where the received message will be stored.
+ * @return The number of bytes received on success, -1 on failure.
+ */
+ssize_t recieve_message(int clientfd, char *buffer)
+{
+    ssize_t bytes_read; // amnt of bytes read from client
+
+    bytes_read = recv(clientfd, buffer, BUFFER_SIZE - 1, 0);
+    if(bytes_read < 0)
+    {
+        perror("recv failed");
+        return -1;
+    } else if (bytes_read == 0)
+    {
+        printf("client disconnected");
+        return 0;
+    } else
+    {
+        // null terminate what's in buffer so we can treat it as a c-string
+        buffer[bytes_read] = '\0';
+        printf("client message: \n%s\n", buffer);
+    }
+    return bytes_read;
+}
 
 /**
  * @brief Creates a pool of worker threads and assigns them to the worker_function

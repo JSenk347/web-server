@@ -26,6 +26,7 @@ int handle_client(int serverfd, struct sockaddr_in *server_addr,
     socklen_t server_addr_len);
 int accept_client(int serverfd, int *clientfd, struct sockaddr_in *server_addr,
     socklen_t *server_addr_len);
+ssize_t recieve_message(int clientfd, char *buffer);
 void thread_pool();
 void* worker_function(void* arg);
 int deq();
