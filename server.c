@@ -37,7 +37,9 @@ int welcome_socket(uint16_t port)
     struct sockaddr_in server_addr;
     socklen_t server_addr_len = sizeof(server_addr);
 
-    if (create_wel_socket(&serverfd) < 0) return -1;
+    // AF_INET = Use IPv4
+    // SOCK_STREAM = specifies stream socket type who's default protocol is TCP
+    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0) return -1;
 
     if (set_socket_opt(serverfd) < 0)
     {
@@ -67,25 +69,27 @@ int welcome_socket(uint16_t port)
 }
 
 /**
- * @brief Creates a TCP welcome socket. Prints error message on failure.
- *
- * @param serverfd Pointer to an integer where the created socket file descriptor will be stored.
+ * @brief Creates a socket with the specified domain and type.
+ * 
+ * @param socketfd Pointer to an integer where the created socket file descriptor will be stored.
+ * @param domain The communication domain (e.g., AF_INET for IPv4).
+ * @param type The communication type (e.g., SOCK_STREAM for TCP).
  * @return 0 on success, -1 on failure.
  */
-int create_wel_socket(int *serverfd)
+int create_socket(int *socketfd, int domain, int type)
 {
     // Validate input pointer
-    if (serverfd == NULL)
+    if (socketfd == NULL)
     {
         fprintf(stderr, "Invalid pointer passed to create_wel_socket\n");
         return -1;
     }
 
-    // Create the socket (IPv4, TCP)
-    *serverfd = socket(AF_INET, SOCK_STREAM, 0); // AF_INET = Use IPv4; SOCK_STREAM = specifies stream socket type who's default protocol is TCP
+    // Create the socket
+    *socketfd = socket(/*AF_INET*/domain, /*SOCK_STREAM*/type, 0);
 
     // Error check socket creation failure
-    if (*serverfd < 0)
+    if (*socketfd < 0)
     {
         perror("\nwelcome socket creation failed");
         return -1;
@@ -175,17 +179,14 @@ int handle_client(int serverfd, struct sockaddr_in *server_addr,
 {
     int incoming_socketfd;
     char buffer[BUFFER_SIZE] = {0}; // buffer for incoming data from clients
-    ssize_t bytes_read; // amnt of bytes read from client
-    
-    // creating a new socket for an incoming ping. program WAITS for incoming request
-    // accept() creates new socket specifically for this client
-    if ((incoming_socketfd = accept(serverfd, (struct sockaddr*)server_addr,
-        &server_addr_len)) < 0)
-    { 
-        perror("accept failed");
+
+    if (accept_client(serverfd, &incoming_socketfd, server_addr, &server_addr_len) < 0)
+    {
         close(serverfd);
         return -1;
     }
+
+    ssize_t bytes_read; // amnt of bytes read from client
 
     bytes_read = recv(incoming_socketfd, buffer, BUFFER_SIZE - 1, 0);
     if(bytes_read < 0)
@@ -206,6 +207,35 @@ int handle_client(int serverfd, struct sockaddr_in *server_addr,
     
     return 0;
 }
+
+/**
+ * @brief Accepts an incoming client connection on the server socket.
+ * 
+ * @param serverfd The server socket file descriptor.
+ * @param clientfd Pointer to an integer where the accepted client socket file descriptor will be stored.
+ * @param server_addr Pointer to the sockaddr_in structure holding the server address.
+ * @param server_addr_len Pointer to the length of the server_addr structure.
+ * @return 0 on success, -1 on failure.
+ */
+int accept_client(int serverfd, int *clientfd, struct sockaddr_in *server_addr,
+    socklen_t *server_addr_len)
+{
+    // error check for null pointers
+    if (clientfd == NULL || server_addr == NULL || server_addr_len == NULL) {
+        fprintf(stderr, "accept_client: invalid arguments\n");
+        return -1;
+    }
+    
+    // creating a new socket for an incoming ping. program WAITS for incoming request
+    // accept() creates new socket specifically for this client
+    if ((*clientfd = accept(serverfd, (struct sockaddr*)server_addr,
+        server_addr_len)) < 0)
+    { 
+        perror("accept failed");
+        return -1;
+    }
+    return 0;
+}   
 
 /**
  * @brief Creates a pool of worker threads and assigns them to the worker_function
