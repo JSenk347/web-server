@@ -4,10 +4,23 @@
  * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
  * @file: main.h
  */
+#ifndef SERVER_H
+#define SERVER_H
 
 #define NUM_THREADS 4   // arbitrary number can change to w/e
 #define MAX_SOCKETS 10  // arbitrary number can change to w/e
+#define NUM_CONNECTIONS 5
+#define BUFFER_SIZE 1024
 
-int init_welcome_socket(uint16_t port);
+#include <netdb.h>
+#include <pthread.h>
+#include <semaphore.h>
+
+int welcome_socket(uint16_t port);
 void thread_pool();
 void* worker_function(void* arg);
+int deq();
+void handle_request();
+
+
+#endif
