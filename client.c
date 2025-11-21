@@ -5,7 +5,7 @@ int connect_client(int clientfd, struct sockaddr_in server_addr);
 
 int main(int argc, char *argv[])
 {
-    const char message[] = "What is up my guy!?";
+    const char message[] = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
     struct sockaddr_in server_addr;
     int clientfd = client_socket(PORT, server_addr);
     if (clientfd < 0){
@@ -71,6 +71,17 @@ void send_request(int sockfd, const char request[]){
         // if bytes_sent > 0 but less than len, a partial send occurred
         printf("warning: only sent %zd of %zu bytes.\n", bytes_sent, len);
     }
-
+    // read HTTP response 
+    char resp[4096];
+    ssize_t n = recv(sockfd, resp, sizeof(resp) - 1, 0);
+    if (n < 0) {
+        perror("error receiving response");
+    } else if (n == 0) {
+        printf("server closed connection without sending data\n");
+    } else {
+        resp[n] = '\0';  // null-terminate so we can print as a string
+        printf("Response from server:\n%s\n", resp);
+    }
+    
     close(sockfd);
 }
