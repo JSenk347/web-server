@@ -253,7 +253,11 @@ ssize_t recieve_message(int clientfd, char *buffer)
     {
         // null terminate what's in buffer so we can treat it as a c-string
         buffer[bytes_read] = '\0';
-        printf("client message: \n%s\n", buffer);
+
+        // handleRequest() will replace parseRequest
+        parseRequest(buffer);
+
+        //printf("client message: \n%s\n", buffer);
     }
     return bytes_read;
 }
@@ -290,6 +294,19 @@ void *worker_function(void *arg)
         handle_request(clientSocket);
         close(clientSocket);
     }
+}
+ // will parse the http request in buffer and populate HTTPRequest and HTTPHeader
+void parseRequest(char *buffer){
+    const char rq_delims[] = "\n";
+    const char start_delims[] = " ";
+    char *token = strtok(buffer, rq_delims); //a pointer to the first token in the array
+    char tokens[1024];
+
+   while (token != NULL){
+    printf("%s\n", token);
+    token = strtok(NULL, rq_delims);
+   }
+
 }
 
 int deq()

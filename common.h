@@ -8,8 +8,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <string.h> // use strtok() to tokenize a string
 
 #define PORT 6767
+
+
 
 int socket_to_string(int sockfd, struct sockaddr_in server_addr);
 int client_socket(uint16_t port, struct sockaddr_in server_addr);

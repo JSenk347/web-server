@@ -15,6 +15,20 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include "lib/uthash.h" 
+
+typedef struct HTTPHeader{
+    char key[64]; // header name such as "Host" or "Content Type"
+    char value[256];
+    UT_hash_handle hh; // makes the header hashable
+} HTTPHeader;
+
+typedef struct HTTPRequest{
+    char method[10];
+    char path[1024];
+    char version[10];
+    HTTPHeader *headers; // pointer to head of the HTTPHeader hash table
+} HTTPRequest;
 
 int welcome_socket(uint16_t port);
 int create_socket(int *socketfd, int domain, int type);
@@ -31,6 +45,7 @@ void thread_pool();
 void* worker_function(void* arg);
 int deq();
 void handle_request();
+void parseRquest(char *buffer);
 
 
 #endif
