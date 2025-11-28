@@ -39,7 +39,8 @@ int welcome_socket(uint16_t port)
 
     // AF_INET = Use IPv4
     // SOCK_STREAM = specifies stream socket type who's default protocol is TCP
-    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0) return -1;
+    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0)
+        return -1;
 
     if (set_socket_opt(serverfd) < 0)
     {
@@ -70,7 +71,7 @@ int welcome_socket(uint16_t port)
 
 /**
  * @brief Creates a socket with the specified domain and type.
- * 
+ *
  * @param socketfd Pointer to an integer where the created socket file descriptor will be stored.
  * @param domain The communication domain (e.g., AF_INET for IPv4).
  * @param type The communication type (e.g., SOCK_STREAM for TCP).
@@ -86,7 +87,7 @@ int create_socket(int *socketfd, int domain, int type)
     }
 
     // Create the socket
-    *socketfd = socket(/*AF_INET*/domain, /*SOCK_STREAM*/type, 0);
+    *socketfd = socket(/*AF_INET*/ domain, /*SOCK_STREAM*/ type, 0);
 
     // Error check socket creation failure
     if (*socketfd < 0)
@@ -108,7 +109,7 @@ int set_socket_opt(int serverfd)
 {
     // Set address/port reusable (optional, for quick restarts)
     int opt = 1;
-    
+
     if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
     {
         // Error check setsockopt failure
@@ -120,7 +121,7 @@ int set_socket_opt(int serverfd)
 
 /**
  * @brief Binds the server socket to the specified port and address.
- * 
+ *
  * @param serverfd The server socket file descriptor.
  * @param port The port number to bind the socket to.
  * @param server_addr Pointer to the sockaddr_in structure to hold the server address.
@@ -128,15 +129,15 @@ int set_socket_opt(int serverfd)
  * @return 0 on success, -1 on failure.
  */
 int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
-    socklen_t server_addr_len)
+                socklen_t server_addr_len)
 {
     /* wipes any garbo from the server_addr structure, filling &server_addr
        with 0 for sizeof(server_addr) bytes */
     memset(server_addr, 0, server_addr_len);
 
-    server_addr->sin_family = AF_INET;             // Specifies the server address TYPE to IPv4
-    server_addr->sin_addr.s_addr = INADDR_ANY;     // Listen on all interfaces -> any of the machines IP addresses. INDADDR_ANY resolves to 0.0.0.0
-    server_addr->sin_port = htons(port);           // Set port number
+    server_addr->sin_family = AF_INET;         // Specifies the server address TYPE to IPv4
+    server_addr->sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces -> any of the machines IP addresses. INDADDR_ANY resolves to 0.0.0.0
+    server_addr->sin_port = htons(port);       // Set port number
 
     // Bind the socket to the address and port -> reserves this port and IP addr for this socket
     if (bind(serverfd, (struct sockaddr *)server_addr, server_addr_len) < 0)
@@ -150,7 +151,7 @@ int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
 
 /**
  * @brief Starts listening for incoming connections on the server socket.
- * 
+ *
  * @param serverfd The server socket file descriptor.
  * @return 0 on success, -1 on failure.
  */
@@ -168,14 +169,14 @@ int start_listening(int serverfd)
 
 /**
  * @brief Handles incoming client connections on the server socket.
- * 
+ *
  * @param serverfd The server socket file descriptor.
  * @param server_addr Pointer to the sockaddr_in structure holding the server address.
  * @param server_addr_len The length of the server_addr structure.
  * @return 0 on success, -1 on failure.
  */
 int handle_client(int serverfd, struct sockaddr_in *server_addr,
-    socklen_t server_addr_len)
+                  socklen_t server_addr_len)
 {
     int incoming_socketfd;
     char buffer[BUFFER_SIZE] = {0}; // buffer for incoming data from clients
@@ -195,14 +196,14 @@ int handle_client(int serverfd, struct sockaddr_in *server_addr,
 
     close(incoming_socketfd);
 
-    //socket_to_string(serverfd, server_addr); // TESTING
-    
+    // socket_to_string(serverfd, server_addr); // TESTING
+
     return 0;
 }
 
 /**
  * @brief Accepts an incoming client connection on the server socket.
- * 
+ *
  * @param serverfd The server socket file descriptor.
  * @param clientfd Pointer to an integer where the accepted client socket file descriptor will be stored.
  * @param server_addr Pointer to the sockaddr_in structure holding the server address.
@@ -210,28 +211,29 @@ int handle_client(int serverfd, struct sockaddr_in *server_addr,
  * @return 0 on success, -1 on failure.
  */
 int accept_client(int serverfd, int *clientfd, struct sockaddr_in *server_addr,
-    socklen_t *server_addr_len)
+                  socklen_t *server_addr_len)
 {
     // error check for null pointers
-    if (clientfd == NULL || server_addr == NULL || server_addr_len == NULL) {
+    if (clientfd == NULL || server_addr == NULL || server_addr_len == NULL)
+    {
         fprintf(stderr, "accept_client: invalid arguments\n");
         return -1;
     }
-    
+
     // creating a new socket for an incoming ping. program WAITS for incoming request
     // accept() creates new socket specifically for this client
-    if ((*clientfd = accept(serverfd, (struct sockaddr*)server_addr,
-        server_addr_len)) < 0)
-    { 
+    if ((*clientfd = accept(serverfd, (struct sockaddr *)server_addr,
+                            server_addr_len)) < 0)
+    {
         perror("accept failed");
         return -1;
     }
     return 0;
-}   
+}
 
 /**
  * @brief Receives a message from the client socket.
- * 
+ *
  * @param clientfd The client socket file descriptor.
  * @param buffer Pointer to the buffer where the received message will be stored.
  * @return The number of bytes received on success, -1 on failure.
@@ -241,23 +243,25 @@ ssize_t recieve_message(int clientfd, char *buffer)
     ssize_t bytes_read; // amnt of bytes read from client
 
     bytes_read = recv(clientfd, buffer, BUFFER_SIZE - 1, 0);
-    if(bytes_read < 0)
+    if (bytes_read < 0)
     {
         perror("recv failed");
         return -1;
-    } else if (bytes_read == 0)
+    }
+    else if (bytes_read == 0)
     {
         printf("client disconnected");
         return 0;
-    } else
+    }
+    else
     {
         // null terminate what's in buffer so we can treat it as a c-string
         buffer[bytes_read] = '\0';
 
         // handleRequest() will replace parseRequest
-        parseRequest(buffer);
+        parse_request(buffer);
 
-        //printf("client message: \n%s\n", buffer);
+        // printf("client message: \n%s\n", buffer);
     }
     return bytes_read;
 }
@@ -295,18 +299,106 @@ void *worker_function(void *arg)
         close(clientSocket);
     }
 }
- // will parse the http request in buffer and populate HTTPRequest and HTTPHeader
-void parseRequest(char *buffer){
-    const char rq_delims[] = "\n";
-    const char start_delims[] = " ";
-    char *token = strtok(buffer, rq_delims); //a pointer to the first token in the array
-    char tokens[1024];
 
-   while (token != NULL){
-    printf("%s\n", token);
-    token = strtok(NULL, rq_delims);
-   }
 
+void delete_all_headers(HTTPHeader **headers){
+    HTTPHeader *current_header, *tmp;
+
+    HASH_ITER(hh, *headers, current_header, tmp){
+        HASH_DEL(*headers, current_header);
+        free(current_header);
+    }
+}
+
+void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value){
+    HTTPHeader *s = (HTTPHeader *)malloc(sizeof(HTTPHeader));
+    if (s == NULL){
+        perror("failed to allcoate HTTPHeader on the heap");
+        return;
+    }   
+
+    const char *trimmed_val = value;
+    while (*trimmed_val == ' '){
+        trimmed_val++;
+    }
+
+    strncpy(s -> key, key, sizeof(s -> key));
+    s -> key[sizeof(s->key) - 1] = '\0';
+    strncpy(s -> value, trimmed_val, sizeof(s -> value));
+    s -> value[sizeof(s -> value) - 1] = '\0';
+
+    HASH_ADD_STR(*headers, key, s);
+}
+
+// will parse the http request in buffer and populate HTTPRequest and HTTPHeader
+void parse_request(const char *buffer)
+{
+    HTTPRequest rq;
+    /*
+    MUST be initialized to NULL to indicate an empty hash table.
+    When adding headers, we will use uthash macros which will handle
+    the hash table management for us.
+    */
+    rq.headers = NULL; // ptr to head of HTTPHeader hash table
+
+    char *buffer_copy = strdup(buffer); // make a modifiable copy of buffer;
+
+    if (buffer_copy == NULL){
+        perror("strdup failed");
+        return;
+    }
+
+    char *line_token, *saveptr_line;
+
+    line_token = strtok_r(buffer_copy, "\r\n", &saveptr_line); // get first line
+
+    if (line_token == NULL){
+        fprintf(stderr, "malformed request: empty or missing request line.\n");
+        free(buffer_copy);
+        return;
+    }
+
+    if (sscanf(line_token, "%9s%1023s%9s", rq.method, rq.path, rq.version) != 3){
+        fprintf(stderr, "malformed request line: %s\n", line_token);
+        free(buffer_copy);
+        return;
+    }
+
+    while ((line_token = strtok_r(NULL, "\r\n", &saveptr_line)) != NULL){
+        if (line_token[0] == '\0'){
+            break;
+        }
+
+        char *key = line_token;
+        char *value = strchr(line_token, ':'); // searchers for first occurence of ":" in line_token and returns pointer to location in array
+
+        if (value){
+            *value = '\0'; // null terminate the key
+            value++; //move past the colon to the start of the value
+
+            add_header_to_hash(&rq.headers, key, value);
+        } else {
+            break;
+        }
+
+    }
+    
+    printf("\n--- Parsed HTTP Request ---\n");
+    printf("Method: %s\n", rq.method);
+    printf("Path: %s\n", rq.path);
+    printf("Version: %s\n", rq.version);
+    
+    printf("Headers:\n");
+    HTTPHeader *current_header, *tmp;
+    HASH_ITER(hh, rq.headers, current_header, tmp) {
+        printf(" - %s: %s\n", current_header->key, current_header->value);
+    }
+    printf("---------------------------\n");
+
+    // Clean up allocated hash table memory
+    delete_all_headers(&rq.headers);
+    free(buffer_copy); // Free the writable copy
+    
 }
 
 int deq()

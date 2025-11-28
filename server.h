@@ -11,17 +11,24 @@
 #define MAX_SOCKETS 10  // arbitrary number can change to w/e
 #define NUM_CONNECTIONS 5
 #define BUFFER_SIZE 1024
+#define RQ_SIZE 8192
+
+#define METHOD_LEN 10
+#define PATH_LEN 1024
+#define VERSION_LEN 10
 
 #include <netdb.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include "lib/uthash.h" 
 
+
+
 typedef struct HTTPHeader{
     char key[64]; // header name such as "Host" or "Content Type"
     char value[256];
     UT_hash_handle hh; // makes the header hashable
-} HTTPHeader;
+} HTTPHeader; // full header example "Host: www.example.com";
 
 typedef struct HTTPRequest{
     char method[10];
@@ -45,7 +52,9 @@ void thread_pool();
 void* worker_function(void* arg);
 int deq();
 void handle_request();
-void parseRquest(char *buffer);
+void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value);
+void delete_all_headers(HTTPHeader **headers);
+void parse_request(const char *buffer);
 
 
 #endif
