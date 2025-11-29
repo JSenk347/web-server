@@ -442,12 +442,12 @@ void handle_request(int clientfd, const char *buffer)
     if (strcmp(rq.path, "/") == 0)
     {
         sprintf(filepath, "www/index.html");
-        
+
         printf("Handling request for path: %s\n", rq.path);
     } //
     else
     {
-        sprintf(filepath, "www%s", rq.path);
+        sprintf(filepath, "%s", rq.path);
     } // construct full file path
 
     struct stat file_stat;
@@ -463,17 +463,36 @@ void handle_request(int clientfd, const char *buffer)
         send(clientfd, not_found_msg, strlen(not_found_msg), 0);
     }
     // If file exists
-    //else
-    //{
-        // Serve file??
-    //    FILE *file = fopen(filepath, "rb");  // create file pointer to read file in binary mode
-    //}
+    else
+    {
+        FILE *file = fopen(filepath, "rb"); // create file pointer to read file in binary mode
 
-    // send 200 OK response to client
-    const char *ok_msg = "HTTP/1.1 200 OK\r\n";
-    send(clientfd, ok_msg, strlen(ok_msg), 0);
+        // Error check file open failure
+        if (file == NULL)
+        {
+            // print error message to server console
+            printf("File open failed");
+            
+            // send 500 response to client
+            const char *server_error_msg = "HTTP/1.1 500 Internal Server Error\r\n";
+            send(clientfd, server_error_msg, strlen(server_error_msg), 0);
 
-    // Send file
+            delete_all_headers(&rq.headers); // clean up allocated hash table memory
+            return;
+        }
+        
+        // Send HTTP headers with 200 OK response to client
+        char header[PATH_LEN];
+        sprintf(header, "HTTP/1.1 200 OK\r\n"
+                        "Content-Length: %ld\r\n"
+                        "Content-Type: text/html\r\n"
+                        "\r\n",
+                file_stat.st_size);
+        send(clientfd, header, strlen(header), 0);
+
+        // Send file
+        
+    }
 
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
 }
