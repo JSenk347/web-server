@@ -434,41 +434,6 @@ int deq()
 }
 
 /**
- * @brief Determines the MIME type based on the file extension.
- *
- * @param filepath The path of the file.
- * @return A string representing the MIME type.
- */
-const char *get_mime_type(const char *filepath) {
-    const char *ext = strrchr(filepath, '.'); // find last occurrence of '.'
-
-    if (ext == NULL) {
-        return "application/octet-stream"; // default for unknown/no extension
-    }
-
-    // skip the dot
-    ext++;
-
-    if (strcmp(ext, "html") == 0 || strcmp(ext, "htm") == 0) {
-        return "text/html";
-    } else if (strcmp(ext, "css") == 0) {
-        return "text/css";
-    } else if (strcmp(ext, "js") == 0) {
-        return "application/javascript";
-    } else if (strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0) {
-        return "image/jpeg";
-    } else if (strcmp(ext, "png") == 0) {
-        return "image/png";
-    } else if (strcmp(ext, "gif") == 0) {
-        return "image/gif";
-    } else if (strcmp(ext, "json") == 0) {
-        return "application/json";
-    }
-    // Add more types as needed
-    return "application/octet-stream"; // Fallback
-}
-
-/**
  * @brief Parses and handles the requests received from the client.
  *          So far, only handles HTTP requests.
  *
@@ -494,47 +459,7 @@ void handle_request(int clientfd, const char *buffer)
     // If file exists
     else
     {
-        //serve_file(clientfd, filepath, file_stat.st_size);
-        FILE *file = fopen(filepath, "rb"); // create file pointer to read file in (rb) binary mode
-
-        // Error check file open failure
-        if (file == NULL)
-        {
-            send_error_response(filepath, clientfd, 500);
-
-            delete_all_headers(&rq.headers); // clean up allocated hash table memory
-            return;
-        }
-        
-        const char *mime_type = get_mime_type(filepath);
-
-        // Send HTTP headers with 200 OK response to client
-        char header[PATH_LEN];
-        sprintf(header, "HTTP/1.1 200 OK\r\n"
-                        "Content-Length: %ld\r\n"
-                        "Content-Type: %s\r\n" //MAY BE SOURCE OF OUTPUT ERROR
-                        "\r\n",
-                file_stat.st_size, mime_type);
-
-        if (send(clientfd, header, strlen(header), 0))
-        {
-            printf("Response sent to the client\n");
-        }
-        else
-        {
-            printf("Response to client failed to send :/");
-        }
-
-        // Send file contents to client
-        char file_buffer[BUFFER_SIZE];
-        size_t bytes_read;
-        while (bytes_read = fread(file_buffer, 1, sizeof(file_buffer), file))
-        {
-            send(clientfd, file_buffer, bytes_read, 0);
-        }
-        fclose(file); // close the file after sending
-        printf("Served file: %s\n", filepath);
-
+        serve_file(clientfd, filepath, file_stat.st_size);
     }
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
     close(clientfd);                 // might not be needed
@@ -583,10 +508,98 @@ void send_error_response(char *filepath, int clientfd, int status_code)
     else
     {
         // print error message to server console
-        printf("Error 500: File open failed");
+        printf("Error 500: Internal Server Error for file: %s\n", filepath);
 
         // create response for client
         sprintf(response, "HTTP/1.1 500 Internal Server Error\r\n");
     }
     send(clientfd, response, strlen(response), 0);
+}
+
+/**
+ * @brief Serves the requested file to the client.
+ *
+ * @param clientfd The client socket file descriptor.
+ * @param filepath The path of the file to be served.
+ * @param filesize The size of the file in bytes.
+ */
+void serve_file(int clientfd, const char *filepath, off_t filesize)
+{
+    FILE *file = fopen(filepath, "rb");
+
+    if (file == NULL)
+    {
+        printf("Failed to open file: %s\n", filepath);
+        send_error_response(filepath, clientfd, 500);
+        return;
+    }
+
+    const char *mime_type = get_mime_type(filepath);
+    char header[PATH_LEN];
+
+    // Build header
+    sprintf(header, "HTTP/1.1 200 OK\r\n"
+                    "Content-Length: %ld\r\n"
+                    "Content-Type: %s\r\n"
+                    "\r\n",
+            filesize, mime_type);
+
+    // Send Header
+    if (send(clientfd, header, strlen(header), 0) == -1)
+    {
+        perror("Failed to send header");
+        fclose(file);
+        return;
+    }
+
+    // Send Body
+    char file_buffer[BUFFER_SIZE];
+    size_t bytes_read;
+    while ((bytes_read = fread(file_buffer, 1, sizeof(file_buffer), file)) > 0)
+    {
+        if (send(clientfd, file_buffer, bytes_read, 0) == -1)
+        {
+            printf("Failed to send file content");
+            send_error_response(filepath, clientfd, 500);
+            break;
+        }
+    }
+
+    fclose(file);
+    printf("Served file: %s\n", filepath);
+}
+
+/**
+ * @brief Determines the MIME type based on the file extension.
+ *
+ * @param filepath The path of the file.
+ * @return A string representing the MIME type.
+ */
+const char *get_mime_type(const char *filepath) {
+    const char *ext = strrchr(filepath, '.'); // find last occurrence of '.'
+
+    if (ext == NULL) {
+        return "application/octet-stream"; // default for unknown/no extension
+    }
+
+    // skip the dot
+    ext++;
+
+    if (strcmp(ext, "html") == 0 || strcmp(ext, "htm") == 0) {
+        return "text/html";
+    } else if (strcmp(ext, "css") == 0) {
+        return "text/css";
+    } else if (strcmp(ext, "js") == 0) {
+        return "application/javascript";
+    } else if (strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0) {
+        return "image/jpeg";
+    } else if (strcmp(ext, "png") == 0) {
+        return "image/png";
+    } else if (strcmp(ext, "gif") == 0) {
+        return "image/gif";
+    } else if (strcmp(ext, "json") == 0) {
+        return "application/json";
+    }
+    // Add more types as needed
+    return "application/octet-stream"; // Fallback
 }
