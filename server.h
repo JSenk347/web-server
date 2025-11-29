@@ -11,6 +11,7 @@
 #define MAX_SOCKETS 10  // arbitrary number can change to w/e
 #define NUM_CONNECTIONS 5
 #define RQ_SIZE 8192
+#define BUFFER_SIZE 1024 // for multi threading
 
 #define METHOD_LEN 10
 #define PATH_LEN 1024
@@ -42,6 +43,15 @@ int set_socket_opt(int serverfd);
 int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
     socklen_t server_addr_len);
 int start_listening(int serverfd);
+
+void init_thread_pool();
+void *worker_function(void *arg);
+void enqueue(int client_socket);
+int dequeue();
+
+
+
+
 int handle_client(int serverfd, struct sockaddr_in *server_addr,
     socklen_t server_addr_len);
 int accept_client(int serverfd, int *clientfd, struct sockaddr_in *server_addr,

@@ -12,14 +12,14 @@
 sem_t sem_items;                          // Counts number of items in the queue
 sem_t sem_q;                              // Semaphore used for locking/unlocking critical sections
 struct sockaddr_in socket_q[MAX_SOCKETS]; // Queue of sockets provided by the main thread. Sockets consumed by the worker threads
-
+pthread_t thread_pool_ids[NUM_THREADS];
 // Common syscalls:
 // socket(), bind(), connect(), recv(), send(), accept()
 
 int main()
 {
     int welcome_sockfd = welcome_socket(PORT); // Create welcome socket to listen for incoming connections
-
+    init_thread_pool();
     // thread_pool(); // Initialize thread pool to handle incoming connections
 
     return 0;
@@ -657,3 +657,18 @@ const char *get_mime_type(const char *filepath)
     // Add more types as needed
     return "application/octet-stream"; // Fallback
 }
+
+
+
+
+// Handle semaphores 
+void init_thread_pool(){
+    for (int i = 0; i < NUM_THREADS; i++)
+    {
+        pthread_create(&thread_pool_ids[i], NULL, worker_function, NULL);
+    }
+    printf("Thread pool initialized with %d workers.\n", NUM_THREADS);
+}
+void *worker_function(void *arg);
+void enqueue(int client_socket);
+int dequeue();
