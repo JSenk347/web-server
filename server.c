@@ -350,17 +350,15 @@ void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value
     HASH_ADD_STR(*headers, key, s);
 }
 
-// will parse the http request in buffer and populate HTTPRequest and HTTPHeader
+/**
+ * @brief Parse the http request in buffer and populate HTTPRequest and
+ *        HTTPHeader structures.
+ * 
+ * @param buffer Pointer to the buffer containing the HTTP request.
+ * @param rq Pointer to the HTTPRequest structure to be populated.
+ */
 void parse_request(const char *buffer, HTTPRequest *rq)
 {
-    // HTTPRequest rq;
-    /*
-    MUST be initialized to NULL to indicate an empty hash table.
-    When adding headers, we will use uthash macros which will handle
-    the hash table management for us.
-    */
-    rq->headers = NULL; // ptr to head of HTTPHeader hash table
-
     char *buffer_copy = strdup(buffer); // make a modifiable copy of buffer;
 
     if (buffer_copy == NULL)
@@ -443,6 +441,12 @@ int deq()
 void handle_request(int clientfd, const char *buffer)
 {
     HTTPRequest rq;
+    /*
+    MUST be initialized to NULL to indicate an empty hash table.
+    When adding headers, we will use uthash macros which will handle
+    the hash table management for us.
+    */
+    rq.headers = NULL; // ptr to head of HTTPHeader hash table
     parse_request(buffer, &rq);
 
     // double the PATH_LEN to accommodate full file paths without overflow risk
