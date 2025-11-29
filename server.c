@@ -304,6 +304,11 @@ void *worker_function(void *arg)
     }
 }
 
+/**
+ * @brief Deletes all headers in the HTTPHeader hash table.
+ * 
+ * @param headers Pointer to the pointer of the head of the HTTPHeader hash table.
+ */
 void delete_all_headers(HTTPHeader **headers)
 {
     HTTPHeader *current_header, *tmp;
@@ -315,6 +320,13 @@ void delete_all_headers(HTTPHeader **headers)
     }
 }
 
+/**
+ * @brief Adds a header key-value pair to the HTTPHeader hash table.
+ * 
+ * @param headers Pointer to the pointer of the head of the HTTPHeader hash table.
+ * @param key The header name (e.g., "Host").
+ * @param value The header value (e.g., "www.example.com").
+ */
 void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value)
 {
     HTTPHeader *s = (HTTPHeader *)malloc(sizeof(HTTPHeader));
@@ -421,6 +433,12 @@ int deq()
     return 0;
 }
 
+/**
+ * @brief Determines the MIME type based on the file extension.
+ *
+ * @param filepath The path of the file.
+ * @return A string representing the MIME type.
+ */
 const char *get_mime_type(const char *filepath) {
     const char *ext = strrchr(filepath, '.'); // find last occurrence of '.'
 
