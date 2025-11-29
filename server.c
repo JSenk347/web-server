@@ -421,6 +421,35 @@ int deq()
     return 0;
 }
 
+const char *get_mime_type(const char *filepath) {
+    const char *ext = strrchr(filepath, '.'); // find last occurrence of '.'
+
+    if (ext == NULL) {
+        return "application/octet-stream"; // default for unknown/no extension
+    }
+
+    // skip the dot
+    ext++;
+
+    if (strcmp(ext, "html") == 0 || strcmp(ext, "htm") == 0) {
+        return "text/html";
+    } else if (strcmp(ext, "css") == 0) {
+        return "text/css";
+    } else if (strcmp(ext, "js") == 0) {
+        return "application/javascript";
+    } else if (strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0) {
+        return "image/jpeg";
+    } else if (strcmp(ext, "png") == 0) {
+        return "image/png";
+    } else if (strcmp(ext, "gif") == 0) {
+        return "image/gif";
+    } else if (strcmp(ext, "json") == 0) {
+        return "application/json";
+    }
+    // Add more types as needed
+    return "application/octet-stream"; // Fallback
+}
+
 /**
  * @brief Parses and handles the requests received from the client.
  *          So far, only handles HTTP requests.
@@ -458,14 +487,16 @@ void handle_request(int clientfd, const char *buffer)
             delete_all_headers(&rq.headers); // clean up allocated hash table memory
             return;
         }
+        
+        const char *mime_type = get_mime_type(filepath);
 
         // Send HTTP headers with 200 OK response to client
         char header[PATH_LEN];
         sprintf(header, "HTTP/1.1 200 OK\r\n"
                         "Content-Length: %ld\r\n"
-                        "Content-Type: %ld\r\n" // MAY BE SOURCE OF OUTPUT ERROR
+                        "Content-Type: %s\r\n" //MAY BE SOURCE OF OUTPUT ERROR
                         "\r\n",
-                file_stat.st_size, file_stat.st_mode);
+                file_stat.st_size, mime_type);
 
         if (send(clientfd, header, strlen(header), 0))
         {

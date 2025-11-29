@@ -71,16 +71,14 @@ void print_response(char *buffer){
 void recieve_response(int serverfd, char *buffer){
     ssize_t bytes_read; // amount of bytes read from client
 
-    while (true){
-        bytes_read = recv(serverfd, buffer, BUFFER_SIZE - 0, 0);
-
-        if (bytes_read > 0){
-            buffer[bytes_read] = '\0';
-            printf("message recieved (%zd bytes)\n", bytes_read);
-            break;
-        }
+    while ((bytes_read = recv(serverfd, buffer, BUFFER_SIZE - 1, 0)) > 0){
+        buffer[bytes_read] = '\0';
+        print_response(buffer);
     }
-    print_response(buffer);
+
+    if (bytes_read < 0){
+        perror("recv failed");
+    }
 }
 
 void send_request(int sockfd, const char request[]){
