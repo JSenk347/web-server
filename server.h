@@ -52,10 +52,13 @@ void* worker_function(void* arg);
 int deq();
 void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value);
 void delete_all_headers(HTTPHeader **headers);
-//void parse_request(const char *buffer);
-void parse_request(const char *buffer, HTTPRequest *rq);
+int parse_request(const char *buffer, HTTPRequest *rq);
+int parse_request_line(const char *line, HTTPRequest *rq);
+void parse_single_header(const char *line, HTTPRequest *rq);
 void handle_request(int clientfd, const char *buffer);
 void create_root_path(char *filepath, HTTPRequest *rq);
 void send_error_response(char *filepath, int clientfd, int status_code);
+void serve_file(int clientfd, const char *filepath, off_t filesize);
+const char *get_mime_type(const char *filepath);
 
 #endif
