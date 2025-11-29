@@ -259,7 +259,8 @@ ssize_t recieve_message(int clientfd, char *buffer)
         buffer[bytes_read] = '\0';
 
         // handleRequest() will replace parseRequest
-        parse_request(buffer);
+        //parse_request(buffer);
+        handle_request(clientfd, buffer);
 
         // printf("client message: \n%s\n", buffer);
     }
@@ -288,6 +289,7 @@ void *worker_function(void *arg)
 {
     while (1)
     {
+        /******COMMENTED OUT FOR TESTING, WILL ADD BACK ONCE THREADS ARE IMPLEMENTED ****************
         sem_wait(&sem_items); // Puts process to sleep until there's at least one item. Will be posted by a producer?
         sem_wait(&sem_q);     // Puts process to sleep if the critical section is being accessed by another process
 
@@ -295,8 +297,9 @@ void *worker_function(void *arg)
 
         sem_post(&sem_q); // Unlock access to the q
 
-        handle_request(clientSocket);
+        handle_request(clientSocket, );
         close(clientSocket);
+        *******************************************************************************************/
     }
 }
 
@@ -331,15 +334,15 @@ void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value
 }
 
 // will parse the http request in buffer and populate HTTPRequest and HTTPHeader
-void parse_request(const char *buffer)
+void parse_request(const char *buffer, HTTPRequest *rq)
 {
-    HTTPRequest rq;
+    //HTTPRequest rq;
     /*
     MUST be initialized to NULL to indicate an empty hash table.
     When adding headers, we will use uthash macros which will handle
     the hash table management for us.
     */
-    rq.headers = NULL; // ptr to head of HTTPHeader hash table
+    rq->headers = NULL; // ptr to head of HTTPHeader hash table
 
     char *buffer_copy = strdup(buffer); // make a modifiable copy of buffer;
 
@@ -358,7 +361,7 @@ void parse_request(const char *buffer)
         return;
     }
 
-    if (sscanf(line_token, "%9s%1023s%9s", rq.method, rq.path, rq.version) != 3){
+    if (sscanf(line_token, "%9s%1023s%9s", rq->method, rq->path, rq->version) != 3){
         fprintf(stderr, "malformed request line: %s\n", line_token);
         free(buffer_copy);
         return;
@@ -376,7 +379,7 @@ void parse_request(const char *buffer)
             *value = '\0'; // null terminate the key
             value++; //move past the colon to the start of the value
 
-            add_header_to_hash(&rq.headers, key, value);
+            add_header_to_hash(&rq->headers, key, value);
         } else {
             break;
         }
@@ -384,19 +387,19 @@ void parse_request(const char *buffer)
     }
     
     printf("\n--- Parsed HTTP Request ---\n");
-    printf("Method: %s\n", rq.method);
-    printf("Path: %s\n", rq.path);
-    printf("Version: %s\n", rq.version);
+    printf("Method: %s\n", rq->method);
+    printf("Path: %s\n", rq->path);
+    printf("Version: %s\n", rq->version);
     
     printf("Headers:\n");
     HTTPHeader *current_header, *tmp;
-    HASH_ITER(hh, rq.headers, current_header, tmp) {
+    HASH_ITER(hh, rq->headers, current_header, tmp) {
         printf(" - %s: %s\n", current_header->key, current_header->value);
     }
     printf("---------------------------\n");
 
     // Clean up allocated hash table memory
-    delete_all_headers(&rq.headers);
+    //delete_all_headers(&rq->headers); now done in handle_request()
     free(buffer_copy); // Free the writable copy
     
 }
@@ -406,7 +409,13 @@ int deq()
     return 0;
 }
 
-void handle_request()
+void handle_request(int clientfd, const char *buffer)
 {
-    ;
+    HTTPRequest rq;
+    
+    parse_request(buffer, &rq);
+
+    // TODO: Add logic to generate and send HTTP response based on parsed request
+    
+    delete_all_headers(&rq.headers); // clean up allocated hash table memory
 }
