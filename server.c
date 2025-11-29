@@ -7,6 +7,7 @@
 
 #include "server.h"
 #include "common.h"
+#include <sys/stat.h>
 
 sem_t sem_items;                          // Counts number of items in the queue
 sem_t sem_q;                              // Semaphore used for locking/unlocking critical sections
@@ -259,7 +260,7 @@ ssize_t recieve_message(int clientfd, char *buffer)
         buffer[bytes_read] = '\0';
 
         // handleRequest() will replace parseRequest
-        //parse_request(buffer);
+        // parse_request(buffer);
         handle_request(clientfd, buffer);
 
         // printf("client message: \n%s\n", buffer);
@@ -303,32 +304,36 @@ void *worker_function(void *arg)
     }
 }
 
-
-void delete_all_headers(HTTPHeader **headers){
+void delete_all_headers(HTTPHeader **headers)
+{
     HTTPHeader *current_header, *tmp;
 
-    HASH_ITER(hh, *headers, current_header, tmp){
+    HASH_ITER(hh, *headers, current_header, tmp)
+    {
         HASH_DEL(*headers, current_header);
         free(current_header);
     }
 }
 
-void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value){
+void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value)
+{
     HTTPHeader *s = (HTTPHeader *)malloc(sizeof(HTTPHeader));
-    if (s == NULL){
+    if (s == NULL)
+    {
         perror("failed to allcoate HTTPHeader on the heap");
         return;
-    }   
+    }
 
     const char *trimmed_val = value;
-    while (*trimmed_val == ' '){
+    while (*trimmed_val == ' ')
+    {
         trimmed_val++;
     }
 
-    strncpy(s -> key, key, sizeof(s -> key));
-    s -> key[sizeof(s->key) - 1] = '\0';
-    strncpy(s -> value, trimmed_val, sizeof(s -> value));
-    s -> value[sizeof(s -> value) - 1] = '\0';
+    strncpy(s->key, key, sizeof(s->key));
+    s->key[sizeof(s->key) - 1] = '\0';
+    strncpy(s->value, trimmed_val, sizeof(s->value));
+    s->value[sizeof(s->value) - 1] = '\0';
 
     HASH_ADD_STR(*headers, key, s);
 }
@@ -336,7 +341,7 @@ void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value
 // will parse the http request in buffer and populate HTTPRequest and HTTPHeader
 void parse_request(const char *buffer, HTTPRequest *rq)
 {
-    //HTTPRequest rq;
+    // HTTPRequest rq;
     /*
     MUST be initialized to NULL to indicate an empty hash table.
     When adding headers, we will use uthash macros which will handle
@@ -346,7 +351,8 @@ void parse_request(const char *buffer, HTTPRequest *rq)
 
     char *buffer_copy = strdup(buffer); // make a modifiable copy of buffer;
 
-    if (buffer_copy == NULL){
+    if (buffer_copy == NULL)
+    {
         perror("strdup failed");
         return;
     }
@@ -355,53 +361,59 @@ void parse_request(const char *buffer, HTTPRequest *rq)
 
     line_token = strtok_r(buffer_copy, "\r\n", &saveptr_line); // get first line
 
-    if (line_token == NULL){
+    if (line_token == NULL)
+    {
         fprintf(stderr, "malformed request: empty or missing request line.\n");
         free(buffer_copy);
         return;
     }
 
-    if (sscanf(line_token, "%9s%1023s%9s", rq->method, rq->path, rq->version) != 3){
+    if (sscanf(line_token, "%9s%1023s%9s", rq->method, rq->path, rq->version) != 3)
+    {
         fprintf(stderr, "malformed request line: %s\n", line_token);
         free(buffer_copy);
         return;
     }
 
-    while ((line_token = strtok_r(NULL, "\r\n", &saveptr_line)) != NULL){
-        if (line_token[0] == '\0'){
+    while ((line_token = strtok_r(NULL, "\r\n", &saveptr_line)) != NULL)
+    {
+        if (line_token[0] == '\0')
+        {
             break;
         }
 
         char *key = line_token;
         char *value = strchr(line_token, ':'); // searchers for first occurence of ":" in line_token and returns pointer to location in array
 
-        if (value){
+        if (value)
+        {
             *value = '\0'; // null terminate the key
-            value++; //move past the colon to the start of the value
+            value++;       // move past the colon to the start of the value
 
             add_header_to_hash(&rq->headers, key, value);
-        } else {
+        }
+        else
+        {
             break;
         }
-
     }
-    
+
     printf("\n--- Parsed HTTP Request ---\n");
     printf("Method: %s\n", rq->method);
     printf("Path: %s\n", rq->path);
     printf("Version: %s\n", rq->version);
-    
+
     printf("Headers:\n");
     HTTPHeader *current_header, *tmp;
-    HASH_ITER(hh, rq->headers, current_header, tmp) {
+    HASH_ITER(hh, rq->headers, current_header, tmp)
+    {
         printf(" - %s: %s\n", current_header->key, current_header->value);
     }
     printf("---------------------------\n");
 
     // Clean up allocated hash table memory
-    //delete_all_headers(&rq->headers); now done in handle_request()
+    // delete_all_headers(&rq->headers); now done in handle_request()
     free(buffer_copy); // Free the writable copy
-    
 }
 
 int deq()
@@ -409,13 +421,59 @@ int deq()
     return 0;
 }
 
+/**
+ * @brief Parses and handles the requests received from the client.
+ *          So far, only handles HTTP requests.
+ *
+ * @param clientfd The client socket file descriptor.
+ * @param buffer Pointer to the buffer containing the received HTTP request.
+ */
 void handle_request(int clientfd, const char *buffer)
 {
     HTTPRequest rq;
-    
     parse_request(buffer, &rq);
 
     // TODO: Add logic to generate and send HTTP response based on parsed request
-    
+
+    // double the PATH_LEN to accommodate full file paths without overflow risk
+    char filepath[PATH_LEN * 2];
+
+    // create root directory path so source files are seperate from server files
+    if (strcmp(rq.path, "/") == 0)
+    {
+        sprintf(filepath, "www/index.html");
+        
+        printf("Handling request for path: %s\n", rq.path);
+    } //
+    else
+    {
+        sprintf(filepath, "www%s", rq.path);
+    } // construct full file path
+
+    struct stat file_stat;
+
+    // If file doesn't exist
+    if (stat(filepath, &file_stat) < 0)
+    {
+        // print error message to server console
+        printf("File not found: %s\n", filepath);
+
+        // send 404 response to client
+        const char *not_found_msg = "HTTP/1.1 404 Not Found\r\n";
+        send(clientfd, not_found_msg, strlen(not_found_msg), 0);
+    }
+    // If file exists
+    //else
+    //{
+        // Serve file??
+    //    FILE *file = fopen(filepath, "rb");  // create file pointer to read file in binary mode
+    //}
+
+    // send 200 OK response to client
+    const char *ok_msg = "HTTP/1.1 200 OK\r\n";
+    send(clientfd, ok_msg, strlen(ok_msg), 0);
+
+    // Send file
+
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
 }
