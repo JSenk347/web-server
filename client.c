@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
     // the "\r\n\r\n" sequence signals the end of the request header block.
     // client is only responsible for sending over bytes. server must parse message once recieved
     const char message[] = 
-        "GET / HTTP/1.1\r\n"
+        "GET www/index.html HTTP/1.1\r\n"
         "Host: 127.0.0.1:6767\r\n"
         "Connection: close\r\n"
         "\r\n";
