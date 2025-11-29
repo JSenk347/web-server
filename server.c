@@ -490,8 +490,15 @@ void handle_request(int clientfd, const char *buffer)
                 file_stat.st_size);
         send(clientfd, header, strlen(header), 0);
 
-        // Send file
-        
+        // Send file contents to client
+        char file_buffer[BUFFER_SIZE];
+        size_t bytes_read;
+        while (bytes_read = fread(file_buffer, 1, sizeof(file_buffer), file))
+        {
+            send(clientfd, file_buffer, bytes_read, 0);
+        }
+        fclose(file); // close the file after sending
+        printf("Served file: %s\n", filepath);
     }
 
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
