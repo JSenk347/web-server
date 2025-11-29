@@ -433,69 +433,48 @@ void handle_request(int clientfd, const char *buffer)
     HTTPRequest rq;
     parse_request(buffer, &rq);
 
-    // TODO: Add logic to generate and send HTTP response based on parsed request
-
     // double the PATH_LEN to accommodate full file paths without overflow risk
     char filepath[PATH_LEN * 2];
-
-    // create root directory path so source files are seperate from server files
-    if (strcmp(rq.path, "/") == 0)
-    {
-        sprintf(filepath, "www/index.html");
-
-        printf("Handling request for path: %s\n", rq.path);
-    } //
-    else
-    {
-        sprintf(filepath, "%s", rq.path);
-    } // construct full file path
+    create_root_path(filepath, &rq);
 
     struct stat file_stat; // will contain info about the file
 
     // If file doesn't exist
     if (stat(filepath, &file_stat) < 0) // writes states about what's at filepath to filestat
     {
-        // print error message to server console
-        printf("File not found: %s\n", filepath);
-
-        // send 404 response to client
-        const char *not_found_msg = "HTTP/1.1 404 Not Found\r\n";
-        send(clientfd, not_found_msg, strlen(not_found_msg), 0);
+        send_error_response(filepath, clientfd, 404);
     }
     // If file exists
     else
     {
+        //serve_file(clientfd, filepath, file_stat.st_size);
         FILE *file = fopen(filepath, "rb"); // create file pointer to read file in (rb) binary mode
 
         // Error check file open failure
         if (file == NULL)
         {
-            // print error message to server console
-            printf("File open failed");
-            
-            // send 500 response to client
-            const char *server_error_msg = "HTTP/1.1 500 Internal Server Error\r\n";
-            send(clientfd, server_error_msg, strlen(server_error_msg), 0);
+            send_error_response(filepath, clientfd, 500);
 
             delete_all_headers(&rq.headers); // clean up allocated hash table memory
             return;
         }
-        
+
         // Send HTTP headers with 200 OK response to client
         char header[PATH_LEN];
         sprintf(header, "HTTP/1.1 200 OK\r\n"
                         "Content-Length: %ld\r\n"
-                        "Content-Type: %ld\r\n" //MAY BE SOURCE OF OUTPUT ERROR
+                        "Content-Type: %ld\r\n" // MAY BE SOURCE OF OUTPUT ERROR
                         "\r\n",
                 file_stat.st_size, file_stat.st_mode);
 
-        if (send(clientfd, header, strlen(header), 0)){
+        if (send(clientfd, header, strlen(header), 0))
+        {
             printf("Response sent to the client\n");
-        } else {
+        }
+        else
+        {
             printf("Response to client failed to send :/");
-
-        }    
-        
+        }
 
         // Send file contents to client
         char file_buffer[BUFFER_SIZE];
@@ -506,8 +485,59 @@ void handle_request(int clientfd, const char *buffer)
         }
         fclose(file); // close the file after sending
         printf("Served file: %s\n", filepath);
-    }
 
+    }
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
-    close(clientfd); // might not be needed
+    close(clientfd);                 // might not be needed
+}
+
+/**
+ * @brief Creates the full file path for the requested resource.
+ *
+ * @param filepath Pointer to the buffer where the full file path will be stored.
+ * @param rq Pointer to the HTTPRequest structure containing the request details.
+ */
+void create_root_path(char *filepath, HTTPRequest *rq)
+{
+    // create root directory path so source files are seperate from server files
+    if (strcmp(rq->path, "/") == 0)
+    {
+        sprintf(filepath, "www/index.html");
+
+        printf("Handling request for path: %s\n", rq->path);
+    } // construct full file path
+    else
+    {
+        sprintf(filepath, "%s", rq->path);
+    }
+}
+
+/**
+ * @brief Sends an error response to the client based on the status code.
+ *
+ * @param filepath The file path related to the error.
+ * @param clientfd The client socket file descriptor.
+ * @param status_code The HTTP status code indicating the type of error.
+ */
+void send_error_response(char *filepath, int clientfd, int status_code)
+{
+    char response[256];
+
+    if (status_code == 404)
+    {
+        // print error message to server console
+        printf("Error 404: File not found: %s\n", filepath);
+
+        // create response for client
+        sprintf(response, "HTTP/1.1 404 Not Found\r\n");
+    }
+    else
+    {
+        // print error message to server console
+        printf("Error 500: File open failed");
+
+        // create response for client
+        sprintf(response, "HTTP/1.1 500 Internal Server Error\r\n");
+    }
+    send(clientfd, response, strlen(response), 0);
 }
