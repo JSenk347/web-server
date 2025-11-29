@@ -10,7 +10,6 @@
 #define NUM_THREADS 4   // arbitrary number can change to w/e
 #define MAX_SOCKETS 10  // arbitrary number can change to w/e
 #define NUM_CONNECTIONS 5
-#define BUFFER_SIZE 1024
 #define RQ_SIZE 8192
 
 #define METHOD_LEN 10

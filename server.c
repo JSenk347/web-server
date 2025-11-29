@@ -450,10 +450,10 @@ void handle_request(int clientfd, const char *buffer)
         sprintf(filepath, "%s", rq.path);
     } // construct full file path
 
-    struct stat file_stat;
+    struct stat file_stat; // will contain info about the file
 
     // If file doesn't exist
-    if (stat(filepath, &file_stat) < 0)
+    if (stat(filepath, &file_stat) < 0) // writes states about what's at filepath to filestat
     {
         // print error message to server console
         printf("File not found: %s\n", filepath);
@@ -465,7 +465,7 @@ void handle_request(int clientfd, const char *buffer)
     // If file exists
     else
     {
-        FILE *file = fopen(filepath, "rb"); // create file pointer to read file in binary mode
+        FILE *file = fopen(filepath, "rb"); // create file pointer to read file in (rb) binary mode
 
         // Error check file open failure
         if (file == NULL)
@@ -485,14 +485,22 @@ void handle_request(int clientfd, const char *buffer)
         char header[PATH_LEN];
         sprintf(header, "HTTP/1.1 200 OK\r\n"
                         "Content-Length: %ld\r\n"
-                        "Content-Type: text/html\r\n"
+                        "Content-Type: %ld\r\n" //MAY BE SOURCE OF OUTPUT ERROR
                         "\r\n",
-                file_stat.st_size);
-        send(clientfd, header, strlen(header), 0);
+                file_stat.st_size, file_stat.st_mode);
+
+        if (send(clientfd, header, strlen(header), 0)){
+            printf("Response sent to the client\n");
+        } else {
+            printf("Response to client failed to send :/");
+
+        }    
+        
 
         // Send file
         
     }
 
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
+    close(clientfd); // might not be needed
 }

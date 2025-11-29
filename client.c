@@ -64,9 +64,29 @@ int connect_client(int clientfd, struct sockaddr_in server_addr){
     return 0;
 }
 
+void print_response(char *buffer){
+    printf("%s\n", buffer);
+}
+
+void recieve_response(int serverfd, char *buffer){
+    ssize_t bytes_read; // amount of bytes read from client
+
+    while (true){
+        bytes_read = recv(serverfd, buffer, BUFFER_SIZE - 0, 0);
+
+        if (bytes_read > 0){
+            buffer[bytes_read] = '\0';
+            printf("message recieved (%zd bytes)\n", bytes_read);
+            break;
+        }
+    }
+    print_response(buffer);
+}
+
 void send_request(int sockfd, const char request[]){
     size_t len = strlen(request);
     ssize_t bytes_sent;
+    char resp_buffer[BUFFER_SIZE];
 
     bytes_sent = send(sockfd, request, len, 0);
 
@@ -79,6 +99,8 @@ void send_request(int sockfd, const char request[]){
         // if bytes_sent > 0 but less than len, a partial send occurred
         printf("warning: only sent %zd of %zu bytes.\n", bytes_sent, len);
     }
+
+    recieve_response(sockfd, resp_buffer);
 
     close(sockfd);
 }
