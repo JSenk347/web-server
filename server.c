@@ -74,49 +74,6 @@ int main()
 }
 
 /**
- * @brief 
- * 
- * @param client_socket The
- */
-void enqueue(int client_socket)
-{
-    sem_wait(&sem_spaces); // if queue is full - wait
-
-    pthread_mutex_lock(&q_mutex); // lock queue
-
-    //---------CRITICAL SECTION: START-----------------------------------------
-    socket_q[q_tail] = client_socket;
-    q_tail = (q_tail + 1) % MAX_SOCKETS;
-    //---------CRITICAL SECTION: END-------------------------------------------
-
-    pthread_mutex_unlock(&q_mutex); // unlock queue
-
-    sem_post(&sem_items); // signal space is available
-}
-
-/**
- * @brief 
- * 
- * @return
- */
-int dequeue()
-{
-    sem_wait(&sem_items); // if queue is empty - wait
-
-    pthread_mutex_lock(&q_mutex); // lock queue
-
-    //---------CRITICAL SECTION: START-----------------------------------------
-    int client_socket = socket_q[q_head];
-    q_head = (q_head + 1) % MAX_SOCKETS;
-    //---------CRITICAL SECTION: END-------------------------------------------
-
-    pthread_mutex_unlock(&q_mutex); // unloack queue
-
-    sem_post(&sem_spaces); // signal space is available
-    return client_socket;
-}
-
-/**
  * @brief Initializes the servers welcome socket to listen for incoming TCP
  *        connections on the specified port.
  *
@@ -729,9 +686,6 @@ const char *get_mime_type(const char *filepath)
     // Add more types as needed
     return "application/octet-stream"; // Fallback
 }
-
-
-
 
 /**
  * @brief Initializes the thread pool by creating worker threads.

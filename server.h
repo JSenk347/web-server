@@ -37,8 +37,6 @@ typedef struct HTTPRequest{
     HTTPHeader *headers; // pointer to head of the HTTPHeader hash table
 } HTTPRequest;
 
-void enqueue(int client_socket);
-int dequeue();
 int welcome_socket(uint16_t port);
 int create_socket(int *socketfd, int domain, int type);
 int set_socket_opt(int serverfd);
