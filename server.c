@@ -16,20 +16,10 @@ pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER; // The Lock
 pthread_cond_t queue_cond_var = PTHREAD_COND_INITIALIZER; // The "Wake Up" Signal
 
 // The Queue (Circular Buffer)
-int socket_queue[MAX_SOCKETS]; // Changed to int! We only need the file descriptor
+int socket_queue[MAX_SOCKETS];       // Queue of clientfile descriptors
 int queue_head = 0;
 int queue_tail = 0;
 int queue_count = 0;
-
-/******************************************************REPLACED****************
-struct sockaddr_in socket_q[MAX_SOCKETS]; // Queue of sockets provided by the main thread. Sockets consumed by the worker threads
-******************************************************************************/
-int socket_q[MAX_SOCKETS];          // Queue of clientfile descriptors
-sem_t sem_items;                    // Counts number of items in the queue
-sem_t sem_spaces;                   // Number of available spaces in queue
-pthread_mutex_t q_mutex;            // Lock protecting critical sections
-int q_head = 0;                     // Consumer - where to take items
-int q_tail = 0;                     // Producer - where to add items
 
 // Common syscalls:
 // socket(), bind(), connect(), recv(), send(), accept()
@@ -466,7 +456,7 @@ int parse_request_line(const char *line, HTTPRequest *rq)
  * @param line The header line to be parsed.
  * @param rq Pointer to the HTTPRequest structure to which the header will be added.
  */
-void parse_single_header(const char *line, HTTPRequest *rq)
+void parse_single_header(char *line, HTTPRequest *rq)
 {
     char *key = line;
 
@@ -716,7 +706,9 @@ void thread_pool(){
     for (int i = 0; i < NUM_THREADS; i++)
     {
         pthread_create(&thread_pool_ids[i], NULL, worker_function, NULL);
-        printf("made a thread\n", NUM_THREADS);
+        printf("made a thread\n"); // replaces below
+        //printf("made a thread\n", NUM_THREADS);
+            //NUM_THREAD isn't doing anything without %d ?
     }
     printf("Thread pool initialized with %d workers.\n", NUM_THREADS);
 }
@@ -729,6 +721,7 @@ void thread_pool(){
 void enqueue(int client_socket) {
     pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
 
+    //----CRITICAL SECTION: START----------------------------------------------
     // Check if queue is full
     if (queue_count < MAX_SOCKETS) 
     {
@@ -747,6 +740,7 @@ void enqueue(int client_socket) {
         printf("Queue full! Dropping connection.\n");
         close(client_socket); 
     }
+    //----CRITICAL SECTION: END------------------------------------------------
 
     pthread_mutex_unlock(&queue_mutex); // Unlock the door
 }
@@ -759,6 +753,7 @@ int dequeue()
 {
     pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
 
+    //----CRITICAL SECTION: START----------------------------------------------
     // Wait while queue is empty (Condition Variable)
     while (queue_count == 0) 
     {
@@ -773,6 +768,8 @@ int dequeue()
 
     // EYE SPY WITH MY LITTLE eye
     printf("  [Worker %lu] Dequeued Client %d. (Queue Remaining: %d)\n", pthread_self(), client_socket, queue_count);
+    //----CRITICAL SECTION: END------------------------------------------------
+
     pthread_mutex_unlock(&queue_mutex); // Unlock the door
     return client_socket;
 }
