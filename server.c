@@ -52,9 +52,7 @@ int main()
     
     while (1) 
     {
-        // Use a standard integer for the socket
         int client_socket;
-        
         // Wait here until a client connects
         client_socket = accept(serverfd, (struct sockaddr *)&client_addr, &client_len);
         
@@ -62,7 +60,6 @@ int main()
             perror("Accept failed");
             continue;
         }
-
         // Send the ID to the queue
         enqueue(client_socket);
     }
