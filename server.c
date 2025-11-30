@@ -477,10 +477,6 @@ void parse_single_header(const char *line, HTTPRequest *rq)
     }
 }
 
-int deq()
-{
-    return 0;
-}
 
 /**
  * @brief Parses and handles the requests received from the client.
