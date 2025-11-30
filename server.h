@@ -11,7 +11,7 @@
 #define MAX_SOCKETS 10  // arbitrary number can change to w/e
 #define NUM_CONNECTIONS 5
 #define RQ_SIZE 8192
-#define BUFFER_SIZE 1024 // for multi threading
+#define THREAD_BUFF_SIZE 1024 // for multi threading
 
 #define METHOD_LEN 10
 #define PATH_LEN 1024
