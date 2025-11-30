@@ -9,21 +9,75 @@
 #include "common.h"
 #include <sys/stat.h>
 
-sem_t sem_items;                          // Counts number of items in the queue
-sem_t sem_q;                              // Semaphore used for locking/unlocking critical sections
-int socket_q[MAX_SOCKETS];                // Queue of client file descriptors 
-//struct sockaddr_in socket_q[MAX_SOCKETS]; // Queue of sockets provided by the main thread. Sockets consumed by the worker threads
+/******************************************************REPLACED****************
+struct sockaddr_in socket_q[MAX_SOCKETS]; // Queue of sockets provided by the main thread. Sockets consumed by the worker threads
+******************************************************************************/
+int socket_q[MAX_SOCKETS];          // Queue of clientfile descriptors
+sem_t sem_items;                    // Counts number of items in the queue
+sem_t sem_spaces;                   // Number of available spaces in queue
+pthread_mutex_t q_mutex;            // Lock protecting critical sections
+int q_head = 0;                     // Consumer - where to take items
+int q_tail = 0;                     // Producer - where to add items
 
 // Common syscalls:
 // socket(), bind(), connect(), recv(), send(), accept()
 
 int main()
 {
-    int welcome_sockfd = welcome_socket(PORT); // Create welcome socket to listen for incoming connections
+    // Semaphore initialization
+    sem_init(&sem_items, 0, 0);             // 0 items in queue
+    sem_init(&sem_spaces, 0, MAX_SOCKETS);  // All spaces available
+    pthread_mutex_init(&q_mutex, NULL);      // Mutex default unlocked 
+    
+    // Create welcome socket to listen for incoming connections
+    int welcome_sockfd = welcome_socket(PORT);
 
     // thread_pool(); // Initialize thread pool to handle incoming connections
 
     return 0;
+}
+
+/**
+ * @brief 
+ * 
+ * @param client_socket The
+ */
+void enqueue(int client_socket)
+{
+    sem_wait(&sem_spaces); // if queue is full - wait
+
+    pthread_mutex_lock(&q_mutex); // lock queue
+
+    //---------CRITICAL SECTION: START-----------------------------------------
+    socket_q[q_tail] = client_socket;
+    q_tail = (q_tail + 1) % MAX_SOCKETS;
+    //---------CRITICAL SECTION: END-------------------------------------------
+
+    pthread_mutex_unlock(&q_mutex); // unlock queue
+
+    sem_post(&sem_items); // signal space is available
+}
+
+/**
+ * @brief 
+ * 
+ * @return
+ */
+int dequeue()
+{
+    sem_wait(&sem_items); // if queue is empty - wait
+
+    pthread_mutex_lock(&q_mutex); // lock queue
+
+    //---------CRITICAL SECTION: START-----------------------------------------
+    int client_socket = socket_q[q_head];
+    q_head = (q_head + 1) % MAX_SOCKETS;
+    //---------CRITICAL SECTION: END-------------------------------------------
+
+    pthread_mutex_unlock(&q_mutex); // unloack queue
+
+    sem_post(&sem_spaces); // signal space is available
+    return client_socket;
 }
 
 /**
