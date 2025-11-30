@@ -514,7 +514,7 @@ void handle_request(int clientfd, const char *buffer)
     create_root_path(filepath, &rq);
 
     // error check for bad request
-    if (filepath == "invalid_path")
+    if (strcmp(filepath, "invalid_path") == 0)
     {
         send_error_response(filepath, clientfd, 400);
         return;
