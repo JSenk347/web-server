@@ -8,6 +8,18 @@
 #include "server.h"
 #include "common.h"
 #include <sys/stat.h>
+#include <signal.h>
+
+// --- THREADING GLOBALS ---
+pthread_t thread_pool_ids[NUM_THREADS]; 
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER; // The Lock
+pthread_cond_t queue_cond_var = PTHREAD_COND_INITIALIZER; // The "Wake Up" Signal
+
+// The Queue (Circular Buffer)
+int socket_queue[MAX_SOCKETS]; // Changed to int! We only need the file descriptor
+int queue_head = 0;
+int queue_tail = 0;
+int queue_count = 0;
 
 sem_t sem_items;                          // Counts number of items in the queue
 sem_t sem_q;                              // Semaphore used for locking/unlocking critical sections
@@ -16,11 +28,41 @@ struct sockaddr_in socket_q[MAX_SOCKETS]; // Queue of sockets provided by the ma
 // Common syscalls:
 // socket(), bind(), connect(), recv(), send(), accept()
 
+// You need this for the signal function
+#include <signal.h> 
+
 int main()
 {
-    int welcome_sockfd = welcome_socket(PORT); // Create welcome socket to listen for incoming connections
+    // Prevent crashes if a client disconnects abruptly
+    signal(SIGPIPE, SIG_IGN); 
 
-    // thread_pool(); // Initialize thread pool to handle incoming connections
+    // Start the Worker Threads
+    thread_pool(); 
+    
+    // Setup the Server Port
+    int serverfd = welcome_socket(PORT); 
+    if (serverfd < 0) {
+        return -1;
+    }
+    printf("Server listening on port %d...\n", PORT);
+
+    // Accept -> Enqueue -> Repeat all day long
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    
+    while (1) 
+    {
+        int client_socket;
+        // Wait here until a client connects
+        client_socket = accept(serverfd, (struct sockaddr *)&client_addr, &client_len);
+        
+        if (client_socket < 0) {
+            perror("Accept failed");
+            continue;
+        }
+        // Send the ID to the queue
+        enqueue(client_socket);
+    }
 
     return 0;
 }
@@ -40,32 +82,27 @@ int welcome_socket(uint16_t port)
 
     // AF_INET = Use IPv4
     // SOCK_STREAM = specifies stream socket type who's default protocol is TCP
-    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0)
-        return -1;
-
-    if (set_socket_opt(serverfd) < 0)
-    {
+    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0) return -1;
+    if (set_socket_opt(serverfd) < 0){
         close(serverfd);
         return -1;
     }
 
-    if (bind_socket(serverfd, port, &server_addr, server_addr_len) < 0)
-    {
+    if (bind_socket(serverfd, port, &server_addr, server_addr_len) < 0){
         close(serverfd);
         return -1;
     }
 
-    if (start_listening(serverfd) < 0)
-    {
+    if (start_listening(serverfd) < 0){
         close(serverfd);
         return -1;
     }
-
-    if (handle_client(serverfd, &server_addr, server_addr_len) < 0)
-    {
-        close(serverfd);
-        return -1;
-    }
+    // JD
+    // if (handle_client(serverfd, &server_addr, server_addr_len) < 0)
+    // {
+    //     close(serverfd);
+    //     return -1;
+    // }
 
     return serverfd; // Returns the file descriptor of the socket
 }
@@ -268,18 +305,6 @@ ssize_t recieve_message(int clientfd, char *buffer)
     return bytes_read;
 }
 
-/**
- * @brief Creates a pool of worker threads and assigns them to the worker_function
- */
-void thread_pool()
-{
-    pthread_t threadPool[NUM_THREADS];
-
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        pthread_create(&threadPool[i], NULL, worker_function, NULL);
-    }
-}
 
 /**
  * @brief Function executed by each worker thread to handle incoming client requests.
@@ -290,18 +315,17 @@ void *worker_function(void *arg)
 {
     while (1)
     {
-        /******COMMENTED OUT FOR TESTING, WILL ADD BACK ONCE THREADS ARE IMPLEMENTED ****************
-        sem_wait(&sem_items); // Puts process to sleep until there's at least one item. Will be posted by a producer?
-        sem_wait(&sem_q);     // Puts process to sleep if the critical section is being accessed by another process
+        // Get a client from the queue and sleep if empty
+        int clientfd = dequeue();
+        char buffer[BUFFER_SIZE] = {0};
 
-        int clientSocket = deq();
-
-        sem_post(&sem_q); // Unlock access to the q
-
-        handle_request(clientSocket, );
-        close(clientSocket);
-        *******************************************************************************************/
+        // We use recieve_message which calls handle_request
+        if (recieve_message(clientfd, buffer) < 0) {
+             // Error logging handled in recieve_message
+        }
+        close(clientfd);
     }
+    return 0;
 }
 
 /**
@@ -453,10 +477,6 @@ void parse_single_header(const char *line, HTTPRequest *rq)
     }
 }
 
-int deq()
-{
-    return 0;
-}
 
 /**
  * @brief Parses and handles the requests received from the client.
@@ -501,7 +521,7 @@ void handle_request(int clientfd, const char *buffer)
         serve_file(clientfd, filepath, file_stat.st_size);
     }
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
-    close(clientfd);                 // might not be needed
+    // JD close(clientfd);                 // might not be needed
 }
 
 /**
@@ -659,4 +679,75 @@ const char *get_mime_type(const char *filepath)
     }
     // Add more types as needed
     return "application/octet-stream"; // Fallback
+}
+
+
+
+
+/**
+ * @brief Initializes the thread pool by creating worker threads.
+ */
+void thread_pool(){
+    for (int i = 0; i < NUM_THREADS; i++)
+    {
+        pthread_create(&thread_pool_ids[i], NULL, worker_function, NULL);
+        printf("made a thread\n", NUM_THREADS);
+    }
+    printf("Thread pool initialized with %d workers.\n", NUM_THREADS);
+}
+
+/**
+ * @brief Enqueues a client socket into the socket queue for processing by worker threads.
+ *
+ * @param client_socket The client socket file descriptor to be enqueued.
+ */
+void enqueue(int client_socket) {
+    pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
+
+    // Check if queue is full
+    if (queue_count < MAX_SOCKETS) 
+    {
+        socket_queue[queue_tail] = client_socket; // Put ticket in buffer
+        queue_tail = (queue_tail + 1) % MAX_SOCKETS; // Move tail
+        queue_count++;
+        
+        // EYE SPY WITH MY LITTLE eye
+        printf("[Producer] Added Client %d to queue. (Queue Size: %d)\n", client_socket, queue_count);
+        // Wake up sleeping beauty (thread)
+        pthread_cond_signal(&queue_cond_var);
+    } 
+    else 
+    {
+        // Queue full 
+        printf("Queue full! Dropping connection.\n");
+        close(client_socket); 
+    }
+
+    pthread_mutex_unlock(&queue_mutex); // Unlock the door
+}
+/**
+ * @brief Dequeues a client socket from the socket queue for processing by worker threads.
+ *
+ * @return The dequeued client socket file descriptor.
+ */
+int dequeue() 
+{
+    pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
+
+    // Wait while queue is empty (Condition Variable)
+    while (queue_count == 0) 
+    {
+        // Sleep until signaled. Releases lock automatically while sleeping.
+        pthread_cond_wait(&queue_cond_var, &queue_mutex);
+    }
+
+    // Woke up and have the lock! Take the item.
+    int client_socket = socket_queue[queue_head];
+    queue_head = (queue_head + 1) % MAX_SOCKETS;
+    queue_count--;
+
+    // EYE SPY WITH MY LITTLE eye
+    printf("  [Worker %lu] Dequeued Client %d. (Queue Remaining: %d)\n", pthread_self(), client_socket, queue_count);
+    pthread_mutex_unlock(&queue_mutex); // Unlock the door
+    return client_socket;
 }
