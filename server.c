@@ -82,23 +82,18 @@ int welcome_socket(uint16_t port)
 
     // AF_INET = Use IPv4
     // SOCK_STREAM = specifies stream socket type who's default protocol is TCP
-    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0)
-        return -1;
-
-    if (set_socket_opt(serverfd) < 0)
-    {
+    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0) return -1;
+    if (set_socket_opt(serverfd) < 0){
         close(serverfd);
         return -1;
     }
 
-    if (bind_socket(serverfd, port, &server_addr, server_addr_len) < 0)
-    {
+    if (bind_socket(serverfd, port, &server_addr, server_addr_len) < 0){
         close(serverfd);
         return -1;
     }
 
-    if (start_listening(serverfd) < 0)
-    {
+    if (start_listening(serverfd) < 0){
         close(serverfd);
         return -1;
     }
@@ -310,18 +305,6 @@ ssize_t recieve_message(int clientfd, char *buffer)
     return bytes_read;
 }
 
-// /**
-//  * @brief Creates a pool of worker threads and assigns them to the worker_function
-//  */
-// void thread_pool()
-// {
-//     pthread_t threadPool[NUM_THREADS];
-
-//     for (int i = 0; i < NUM_THREADS; i++)
-//     {
-//         pthread_create(&threadPool[i], NULL, worker_function, NULL);
-//     }
-// }
 
 /**
  * @brief Function executed by each worker thread to handle incoming client requests.
@@ -332,22 +315,17 @@ void *worker_function(void *arg)
 {
     while (1)
     {
-        // 1. Get a client from the queue (Sleeps if empty)
+        // Get a client from the queue and sleep if empty
         int clientfd = dequeue();
-
-        // 2. Prepare a buffer
         char buffer[BUFFER_SIZE] = {0};
 
-        // 3. Receive and Handle
         // We use recieve_message which calls handle_request
         if (recieve_message(clientfd, buffer) < 0) {
              // Error logging handled in recieve_message
         }
-
-        // 4. Close the connection
         close(clientfd);
     }
-    return NULL;
+    return 0;
 }
 
 /**
@@ -707,7 +685,9 @@ const char *get_mime_type(const char *filepath)
 
 
 
-// Handle semaphores 
+/**
+ * @brief Initializes the thread pool by creating worker threads.
+ */
 void thread_pool(){
     for (int i = 0; i < NUM_THREADS; i++)
     {
@@ -717,7 +697,11 @@ void thread_pool(){
     printf("Thread pool initialized with %d workers.\n", NUM_THREADS);
 }
 
-void *worker_function(void *arg);
+/**
+ * @brief Enqueues a client socket into the socket queue for processing by worker threads.
+ *
+ * @param client_socket The client socket file descriptor to be enqueued.
+ */
 void enqueue(int client_socket) {
     pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
 
@@ -728,7 +712,7 @@ void enqueue(int client_socket) {
         queue_tail = (queue_tail + 1) % MAX_SOCKETS; // Move tail
         queue_count++;
         
-        // EYE SPY WITH MY LITTLE LAUGH 
+        // EYE SPY WITH MY LITTLE eye
         printf("[Producer] Added Client %d to queue. (Queue Size: %d)\n", client_socket, queue_count);
         // Wake up sleeping beauty (thread)
         pthread_cond_signal(&queue_cond_var);
@@ -742,7 +726,11 @@ void enqueue(int client_socket) {
 
     pthread_mutex_unlock(&queue_mutex); // Unlock the door
 }
-
+/**
+ * @brief Dequeues a client socket from the socket queue for processing by worker threads.
+ *
+ * @return The dequeued client socket file descriptor.
+ */
 int dequeue() 
 {
     pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
@@ -754,12 +742,12 @@ int dequeue()
         pthread_cond_wait(&queue_cond_var, &queue_mutex);
     }
 
-    // We woke up and have the lock! Take the item.
+    // Woke up and have the lock! Take the item.
     int client_socket = socket_queue[queue_head];
     queue_head = (queue_head + 1) % MAX_SOCKETS;
     queue_count--;
-    // --- SPY PRINT ---
-    // pthread_self() gives us the ID of the specific worker thread running this
+
+    // EYE SPY WITH MY LITTLE eye
     printf("  [Worker %lu] Dequeued Client %d. (Queue Remaining: %d)\n", pthread_self(), client_socket, queue_count);
     pthread_mutex_unlock(&queue_mutex); // Unlock the door
     return client_socket;
