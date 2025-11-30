@@ -532,7 +532,7 @@ void create_root_path(char *filepath, HTTPRequest *rq)
  * @param clientfd The client socket file descriptor.
  * @param status_code The HTTP status code indicating the type of error.
  */
-void send_error_response(char *filepath, int clientfd, int status_code)
+void send_error_response(const char *filepath, int clientfd, int status_code)
 {
     char response[256];
 
@@ -576,12 +576,15 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
     const char *mime_type = get_mime_type(filepath);
     char header[PATH_LEN];
 
+    char *file_name = strchr(filepath, '/');
+
     // Build header
     sprintf(header, "HTTP/1.1 200 OK\r\n"
+                    "File-Name: %s\r\n"
                     "Content-Length: %ld\r\n"
                     "Content-Type: %s\r\n"
                     "\r\n",
-            filesize, mime_type);
+            file_name, filesize, mime_type);
 
     // Send Header
     if (send(clientfd, header, strlen(header), 0) == -1)

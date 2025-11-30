@@ -57,7 +57,7 @@ int parse_request_line(const char *line, HTTPRequest *rq);
 void parse_single_header(const char *line, HTTPRequest *rq);
 void handle_request(int clientfd, const char *buffer);
 void create_root_path(char *filepath, HTTPRequest *rq);
-void send_error_response(char *filepath, int clientfd, int status_code);
+void send_error_response(const char *filepath, int clientfd, int status_code);
 void serve_file(int clientfd, const char *filepath, off_t filesize);
 const char *get_mime_type(const char *filepath);
 
