@@ -11,7 +11,8 @@
 
 sem_t sem_items;                          // Counts number of items in the queue
 sem_t sem_q;                              // Semaphore used for locking/unlocking critical sections
-struct sockaddr_in socket_q[MAX_SOCKETS]; // Queue of sockets provided by the main thread. Sockets consumed by the worker threads
+int socket_q[MAX_SOCKETS];                // Queue of client file descriptors 
+//struct sockaddr_in socket_q[MAX_SOCKETS]; // Queue of sockets provided by the main thread. Sockets consumed by the worker threads
 
 // Common syscalls:
 // socket(), bind(), connect(), recv(), send(), accept()
