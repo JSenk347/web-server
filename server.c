@@ -37,7 +37,7 @@ int main()
     signal(SIGPIPE, SIG_IGN); 
 
     // Start the Worker Threads
-    init_thread_pool(); 
+    thread_pool(); 
     
     // Setup the Server Port
     int serverfd = welcome_socket(PORT); 
@@ -310,18 +310,18 @@ ssize_t recieve_message(int clientfd, char *buffer)
     return bytes_read;
 }
 
-/**
- * @brief Creates a pool of worker threads and assigns them to the worker_function
- */
-void thread_pool()
-{
-    pthread_t threadPool[NUM_THREADS];
+// /**
+//  * @brief Creates a pool of worker threads and assigns them to the worker_function
+//  */
+// void thread_pool()
+// {
+//     pthread_t threadPool[NUM_THREADS];
 
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        pthread_create(&threadPool[i], NULL, worker_function, NULL);
-    }
-}
+//     for (int i = 0; i < NUM_THREADS; i++)
+//     {
+//         pthread_create(&threadPool[i], NULL, worker_function, NULL);
+//     }
+// }
 
 /**
  * @brief Function executed by each worker thread to handle incoming client requests.
@@ -708,7 +708,7 @@ const char *get_mime_type(const char *filepath)
 
 
 // Handle semaphores 
-void init_thread_pool(){
+void thread_pool(){
     for (int i = 0; i < NUM_THREADS; i++)
     {
         pthread_create(&thread_pool_ids[i], NULL, worker_function, NULL);
@@ -716,6 +716,7 @@ void init_thread_pool(){
     }
     printf("Thread pool initialized with %d workers.\n", NUM_THREADS);
 }
+
 void *worker_function(void *arg);
 void enqueue(int client_socket) {
     pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock

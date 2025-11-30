@@ -44,7 +44,7 @@ int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
     socklen_t server_addr_len);
 int start_listening(int serverfd);
 
-void init_thread_pool();
+void thread_pool();
 void *worker_function(void *arg);
 void enqueue(int client_socket);
 int dequeue();
@@ -57,7 +57,6 @@ int handle_client(int serverfd, struct sockaddr_in *server_addr,
 int accept_client(int serverfd, int *clientfd, struct sockaddr_in *server_addr,
     socklen_t *server_addr_len);
 ssize_t recieve_message(int clientfd, char *buffer);
-void thread_pool();
 void* worker_function(void* arg);
 int deq();
 void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value);
