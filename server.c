@@ -11,12 +11,13 @@
 #include <signal.h>
 
 // --- THREADING GLOBALS ---
-pthread_t thread_pool_ids[NUM_THREADS]; 
-pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER; // The Lock
+pthread_t thread_pool_ids[NUM_THREADS];
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // The Lock
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;    // Logging Lock
 pthread_cond_t queue_cond_var = PTHREAD_COND_INITIALIZER; // The "Wake Up" Signal
 
 // The Queue (Circular Buffer)
-int socket_queue[MAX_SOCKETS];       // Queue of clientfile descriptors
+int socket_queue[MAX_SOCKETS]; // Queue of clientfile descriptors
 int queue_head = 0;
 int queue_tail = 0;
 int queue_count = 0;
@@ -25,19 +26,20 @@ int queue_count = 0;
 // socket(), bind(), connect(), recv(), send(), accept()
 
 // You need this for the signal function
-#include <signal.h> 
+#include <signal.h>
 
 int main()
 {
     // Prevent crashes if a client disconnects abruptly
-    signal(SIGPIPE, SIG_IGN); 
+    signal(SIGPIPE, SIG_IGN);
 
     // Start the Worker Threads
-    thread_pool(); 
-    
+    thread_pool();
+
     // Setup the Server Port
-    int serverfd = welcome_socket(PORT); 
-    if (serverfd < 0) {
+    int serverfd = welcome_socket(PORT);
+    if (serverfd < 0)
+    {
         return -1;
     }
     printf("Server listening on port %d...\n", PORT);
@@ -45,14 +47,15 @@ int main()
     // Accept -> Enqueue -> Repeat all day long
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
-    
-    while (1) 
+
+    while (1)
     {
         int client_socket;
         // Wait here until a client connects
         client_socket = accept(serverfd, (struct sockaddr *)&client_addr, &client_len);
-        
-        if (client_socket < 0) {
+
+        if (client_socket < 0)
+        {
             perror("Accept failed");
             continue;
         }
@@ -78,18 +81,22 @@ int welcome_socket(uint16_t port)
 
     // AF_INET = Use IPv4
     // SOCK_STREAM = specifies stream socket type who's default protocol is TCP
-    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0) return -1;
-    if (set_socket_opt(serverfd) < 0){
+    if (create_socket(&serverfd, AF_INET, SOCK_STREAM) < 0)
+        return -1;
+    if (set_socket_opt(serverfd) < 0)
+    {
         close(serverfd);
         return -1;
     }
 
-    if (bind_socket(serverfd, port, &server_addr, server_addr_len) < 0){
+    if (bind_socket(serverfd, port, &server_addr, server_addr_len) < 0)
+    {
         close(serverfd);
         return -1;
     }
 
-    if (start_listening(serverfd) < 0){
+    if (start_listening(serverfd) < 0)
+    {
         close(serverfd);
         return -1;
     }
@@ -301,7 +308,6 @@ ssize_t recieve_message(int clientfd, char *buffer)
     return bytes_read;
 }
 
-
 /**
  * @brief Function executed by each worker thread to handle incoming client requests.
  *
@@ -316,8 +322,9 @@ void *worker_function(void *arg)
         char buffer[BUFFER_SIZE] = {0};
 
         // We use recieve_message which calls handle_request
-        if (recieve_message(clientfd, buffer) < 0) {
-             // Error logging handled in recieve_message
+        if (recieve_message(clientfd, buffer) < 0)
+        {
+            // Error logging handled in recieve_message
         }
         close(clientfd);
     }
@@ -429,7 +436,7 @@ int parse_request(const char *buffer, HTTPRequest *rq)
 
     // Clean up allocated hash table memory
     free(buffer_copy); // Free the writable copy
-    return 200; // Ok
+    return 200;        // Ok
 }
 
 /**
@@ -473,7 +480,6 @@ void parse_single_header(char *line, HTTPRequest *rq)
     }
 }
 
-
 /**
  * @brief Parses and handles the requests received from the client.
  *          So far, only handles HTTP requests.
@@ -490,8 +496,8 @@ void handle_request(int clientfd, const char *buffer)
     the hash table management for us.
     */
     rq.headers = NULL; // ptr to head of HTTPHeader hash table
-    
-    int status = parse_request(buffer, &rq); // parse client request 
+
+    int status = parse_request(buffer, &rq); // parse client request
     // error check
     if (status != 200)
     {
@@ -541,7 +547,7 @@ void create_root_path(char *filepath, HTTPRequest *rq)
         sprintf(filepath, "invalid_path");
         return;
     }
-    
+
     // create root directory path so source files are seperate from server files
     if (strcmp(rq->path, "/") == 0)
     {
@@ -566,28 +572,20 @@ void send_error_response(const char *filepath, int clientfd, int status_code)
 {
     char response[256];
 
+    // safely print error message to server console
+    log_request(clientfd, "GET", (char *)filepath, status_code);
+
+    // create response for client
     if (status_code == 400)
     {
-         // print error message to server console
-        printf("Error 400: Bad Request: %s\n", filepath);
-
-        // create response for client
-        sprintf(response, "HTTP/1.1 400 Bad Request\r\n");       
+        sprintf(response, "HTTP/1.1 400 Bad Request\r\n");
     }
     else if (status_code == 404)
     {
-        // print error message to server console
-        printf("Error 404: File not found: %s\n", filepath);
-
-        // create response for client
         sprintf(response, "HTTP/1.1 404 Not Found\r\n");
     }
     else
     {
-        // print error message to server console
-        printf("Error 500: Internal Server Error for file: %s\n", filepath);
-
-        // create response for client
         sprintf(response, "HTTP/1.1 500 Internal Server Error\r\n");
     }
     send(clientfd, response, strlen(response), 0);
@@ -646,7 +644,29 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
     }
 
     fclose(file);
-    printf("Served file: %s\n", filepath);
+    log_request(clientfd, "GET", (char *)filepath, 200); // safely prints here instead
+    // printf("Served file: %s\n", filepath);
+}
+
+/**
+ * @brief //TODO
+ *
+ * @param client_fd
+ * @param method
+ * @param path
+ * @param status
+ *
+ */
+void log_request(int client_fd, char *method, const char *filepath, int status)
+{
+    pthread_mutex_lock(&log_mutex);
+
+    //----CRITICAL SECTION: START----------------------------------------------
+    printf("[Worker thread: %lu] %s %s -> Status: %d\n", pthread_self(),
+           method, filepath, status);
+    //----CRITICAL SECTION: END------------------------------------------------
+
+    pthread_mutex_unlock(&log_mutex);
 }
 
 /**
@@ -702,13 +722,13 @@ const char *get_mime_type(const char *filepath)
 /**
  * @brief Initializes the thread pool by creating worker threads.
  */
-void thread_pool(){
+void thread_pool()
+{
     for (int i = 0; i < NUM_THREADS; i++)
     {
         pthread_create(&thread_pool_ids[i], NULL, worker_function, NULL);
-        printf("made a thread\n"); // replaces below
-        //printf("made a thread\n", NUM_THREADS);
-            //NUM_THREAD isn't doing anything without %d ?
+        // printf("made a thread\n", NUM_THREADS);
+        // NUM_THREAD isn't doing anything without %d ? 
     }
     printf("Thread pool initialized with %d workers.\n", NUM_THREADS);
 }
@@ -718,44 +738,46 @@ void thread_pool(){
  *
  * @param client_socket The client socket file descriptor to be enqueued.
  */
-void enqueue(int client_socket) {
+void enqueue(int client_socket)
+{
     pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
 
     //----CRITICAL SECTION: START----------------------------------------------
     // Check if queue is full
-    if (queue_count < MAX_SOCKETS) 
+    if (queue_count < MAX_SOCKETS)
     {
-        socket_queue[queue_tail] = client_socket; // Put ticket in buffer
+        socket_queue[queue_tail] = client_socket;    // Put ticket in buffer
         queue_tail = (queue_tail + 1) % MAX_SOCKETS; // Move tail
         queue_count++;
-        
+
         // EYE SPY WITH MY LITTLE eye
         printf("[Producer] Added Client %d to queue. (Queue Size: %d)\n", client_socket, queue_count);
         // Wake up sleeping beauty (thread)
         pthread_cond_signal(&queue_cond_var);
-    } 
-    else 
+    }
+    else
     {
-        // Queue full 
+        // Queue full
         printf("Queue full! Dropping connection.\n");
-        close(client_socket); 
+        close(client_socket);
     }
     //----CRITICAL SECTION: END------------------------------------------------
 
     pthread_mutex_unlock(&queue_mutex); // Unlock the door
 }
+
 /**
  * @brief Dequeues a client socket from the socket queue for processing by worker threads.
  *
  * @return The dequeued client socket file descriptor.
  */
-int dequeue() 
+int dequeue()
 {
     pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
 
     //----CRITICAL SECTION: START----------------------------------------------
     // Wait while queue is empty (Condition Variable)
-    while (queue_count == 0) 
+    while (queue_count == 0)
     {
         // Sleep until signaled. Releases lock automatically while sleeping.
         pthread_cond_wait(&queue_cond_var, &queue_mutex);

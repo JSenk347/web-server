@@ -68,6 +68,7 @@ void handle_request(int clientfd, const char *buffer);
 void create_root_path(char *filepath, HTTPRequest *rq);
 void send_error_response(const char *filepath, int clientfd, int status_code);
 void serve_file(int clientfd, const char *filepath, off_t filesize);
+void log_request(int client_fd, char *method, const char *filepath, int status);
 const char *get_mime_type(const char *filepath);
 
 #endif
