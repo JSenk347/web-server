@@ -513,6 +513,13 @@ void handle_request(int clientfd, const char *buffer)
     char filepath[PATH_LEN * 2];
     create_root_path(filepath, &rq);
 
+    // error check for bad request
+    if (filepath == "invalid_path")
+    {
+        send_error_response(filepath, clientfd, 400);
+        return;
+    }
+
     struct stat file_stat; // will contain info about the file
 
     // If file doesn't exist
@@ -538,6 +545,13 @@ void handle_request(int clientfd, const char *buffer)
  */
 void create_root_path(char *filepath, HTTPRequest *rq)
 {
+    // Security check to block access to www parent folders
+    if (strstr(rq->path, "..") != NULL)
+    {
+        sprintf(filepath, "invalid_path");
+        return;
+    }
+    
     // create root directory path so source files are seperate from server files
     if (strcmp(rq->path, "/") == 0)
     {
@@ -547,7 +561,7 @@ void create_root_path(char *filepath, HTTPRequest *rq)
     } // construct full file path
     else
     {
-        sprintf(filepath, "%s", rq->path);
+        sprintf(filepath, "www%s", rq->path);
     }
 }
 
@@ -562,7 +576,15 @@ void send_error_response(const char *filepath, int clientfd, int status_code)
 {
     char response[256];
 
-    if (status_code == 404)
+    if (status_code == 400)
+    {
+         // print error message to server console
+        printf("Error 400: Bad Request: %s\n", filepath);
+
+        // create response for client
+        sprintf(response, "HTTP/1.1 400 Bad Request\r\n");       
+    }
+    else if (status_code == 404)
     {
         // print error message to server console
         printf("Error 404: File not found: %s\n", filepath);
