@@ -439,6 +439,18 @@ int parse_request(const char *buffer, HTTPRequest *rq)
     return 200;        // Ok
 }
 
+int is_valid_method(char *method){
+    const char *methods = {"GET"};
+    int i;
+
+    for (i = 0; i < (sizeof(*methods) / sizeof(methods[i])); i++){
+        if (strcmp(&(methods[i]), method) == 0){
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /**
  * @brief Parses the request line of the HTTP request.
  *
@@ -449,11 +461,22 @@ int parse_request(const char *buffer, HTTPRequest *rq)
  */
 int parse_request_line(const char *line, HTTPRequest *rq)
 {
+    
     if (sscanf(line, "%9s%1023s%9s", rq->method, rq->path, rq->version) != 3)
     {
         fprintf(stderr, "malformed request line: %s\n", line);
         return -1;
     }
+
+    if (!is_valid_method(rq -> method)){
+        return -1;
+    }
+
+    printf("PARSED START LINE:\n");
+    printf("Method: %s\n", rq->method);
+    printf("Path: %s\n", rq->path);
+    printf("Version: %s\n", rq->version);
+
     return 0;
 }
 
@@ -789,7 +812,7 @@ int dequeue()
     queue_count--;
 
     // EYE SPY WITH MY LITTLE eye
-    printf("  [Worker %lu] Dequeued Client %d. (Queue Remaining: %d)\n", pthread_self(), client_socket, queue_count);
+    printf("  [Worker %lu] Dequeued Client %d. Queue Size Remaining: %d\n", pthread_self(), client_socket, queue_count);
     //----CRITICAL SECTION: END------------------------------------------------
 
     pthread_mutex_unlock(&queue_mutex); // Unlock the door

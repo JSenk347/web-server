@@ -11,7 +11,7 @@
 #define MAX_SOCKETS 10  // arbitrary number can change to w/e
 #define NUM_CONNECTIONS 5
 #define RQ_SIZE 8192
-#define THREAD_BUFF_SIZE 1024 // for multi threading
+#define THREAD_BUFF_SIZE 1024 // UNUSED CONSTANT
 
 #define METHOD_LEN 10
 #define PATH_LEN 1024
@@ -70,5 +70,7 @@ void send_error_response(const char *filepath, int clientfd, int status_code);
 void serve_file(int clientfd, const char *filepath, off_t filesize);
 void log_request(int client_fd, char *method, const char *filepath, int status);
 const char *get_mime_type(const char *filepath);
+int parse_request_line(const char *line, HTTPRequest *rq);
+void parse_single_header(char *line, HTTPRequest *rq);
 
 #endif

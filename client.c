@@ -1,12 +1,16 @@
 #include "common.h"
+#include <unistd.h>
 
 #define FILE_NAME_LEN 32
 
 void send_request(int sockfd, const char request[]);
 int connect_client(int clientfd, struct sockaddr_in server_addr);
 
+
 int main(int argc, char *argv[])
-{
+{ 
+    pid_t pid = getpid();
+    printf("[PID %d] - client process started.\n", pid);
 
     // the "\r\n\r\n" sequence signals the end of the request header block.
     // client is only responsible for sending over bytes. server must parse message once recieved
@@ -25,17 +29,20 @@ int main(int argc, char *argv[])
     }
     send_request(clientfd, message);
 
+    printf("[PID %i] - client process finished.\n", pid);
     return 0;
 }
 
 int client_socket(uint16_t port, struct sockaddr_in server_addr)
 {
+    pid_t pid = getpid();
+
     int clientfd;
     clientfd = socket(AF_INET, SOCK_STREAM, 0); // creating client socket using IPv4 and TCP
 
     if (clientfd < 0)
     {
-        perror("    - client socket creation failed\n");
+        printf("[PID %i] - ❌ (1/5) client socket creation failed\n", pid);
         return -1;
     }
 
@@ -45,29 +52,31 @@ int client_socket(uint16_t port, struct sockaddr_in server_addr)
     // convert IPv4 and IPv6 into binary for error checking
     if (inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr) <= 0)
     {
-        perror("    - invalid address / address not supported\n");
+        printf("[PID %i] - ❌ (1/5) socket hosted on invalid/unsupported address\n", pid);
         return -1;
     }
 
+    printf("[PID %i] - ✔️ (1/5) client socket creation successful\n", pid);
+
     if (connect_client(clientfd, server_addr) != 0)
-    {
-        perror("    - connection failed\n\n");
+    { 
+        return -1;
     }
 
-    // socket_to_string(clientfd, server_addr); // TESTING
     return clientfd;
 }
 
 int connect_client(int clientfd, struct sockaddr_in server_addr)
 {
-    printf("----> Connection Establishment\n");
+    pid_t pid = getpid();
+
     int status = connect(clientfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if (status < 0)
     {
-        perror("    - connection failed\n\n");
+        printf("[PID %i] - ❌ (2/5) connection failed\n", pid);
         return -1;
     }
-    printf("    - client connected successfuly\n\n");
+    printf("[PID %i] - ✔️ (2/5) client connected successfuly\n", pid);
     return 0;
 }
 
@@ -78,6 +87,8 @@ void print_response(char *buffer)
 
 void read_remaining_body_bytes(long remaining_bytes, long *total_written, char *buffer, int sockfd, FILE *outfile, char *file_name)
 {
+    pid_t pid = getpid();
+
     size_t bytes_recieved = -1;
 
     while (remaining_bytes > 0)
@@ -87,7 +98,7 @@ void read_remaining_body_bytes(long remaining_bytes, long *total_written, char *
 
         if (bytes_recieved < 0)
         {
-            perror("            - Warning: Premature end of body data");
+            printf("[PID %i] - ⚠️ Warning: premature end of body data", pid);
             return;
         }
         // fwrite(ptr_to_data_to_write, size_to_be_written, num_elems_to_write, ptr_to_file)
@@ -96,12 +107,12 @@ void read_remaining_body_bytes(long remaining_bytes, long *total_written, char *
         remaining_bytes -= bytes_recieved;
         *total_written += bytes_recieved;
     }
-    printf("            - wrote %li bytes to %s\n\n", *total_written, file_name);
 }
 
-void save_file(size_t body_bytes, char *body_start, int content_len, char *file_name, int sockfd)
+int save_file(size_t body_bytes, char *body_start, int content_len, char *file_name, int sockfd)
 {
-    printf("    ----> Saving File\n");
+    pid_t pid = getpid();
+
     FILE *outfile = NULL;
     char file_path[FILE_NAME_LEN]; // buffer for "client_req/filename"
     char buffer[BUFFER_SIZE];      // local buffer for receiving data
@@ -109,13 +120,12 @@ void save_file(size_t body_bytes, char *body_start, int content_len, char *file_
     file_name++; // to skip past "/"
 
     snprintf(file_path, sizeof(file_path), "client_req/%s", file_name);
-    printf("            - file path: %s\n", file_path);
 
     outfile = fopen(file_path, "wb"); // open file in (wb) write binary mode
     if (outfile == NULL)
     {
-        perror("            - Error: Failed to open file for writing\n\n");
-        return;
+        printf("[PID %i] - ❌ (5/5) Error: failed to open file for writing\n", pid);
+        return -1;
     }
 
     if (body_bytes > 0)
@@ -123,16 +133,20 @@ void save_file(size_t body_bytes, char *body_start, int content_len, char *file_
         fwrite(body_start, 1, body_bytes, outfile);
     }
 
+    printf("[PID %i] - ✔️ (5/5) %i bytes written to %s, saved in %s\n", pid, content_len, file_name, file_path);
+
     long remaining_bytes = content_len - body_bytes;
     long long_body_bytes = body_bytes;
     read_remaining_body_bytes(remaining_bytes, &long_body_bytes, buffer, sockfd, outfile, file_name);
 
     fclose(outfile);
+    return 0;
 }
 
 int content_length(const char *buffer)
 {
-    printf("    ----> Extracting Content Length\n");
+    pid_t pid = getpid();
+
     int content_length = -1;
     char *len_line = strstr(buffer, "Content-Length:");
 
@@ -140,7 +154,6 @@ int content_length(const char *buffer)
     {
         if (sscanf(len_line, "Content-Length: %d", &content_length) == 1)
         {
-            printf("            - content length: %i bytes\n\n", content_length);
             return content_length;
         }
         else
@@ -150,7 +163,7 @@ int content_length(const char *buffer)
     }
     else
     {
-        printf("            - Warning: Content-Length not found. Cannot reliably read file body.\n\n");
+        printf("[PID %i] - ⚠️ Warning: Content-Length not found. cannot reliably read file body.\n", pid);
         return -1;
     }
 }
@@ -203,7 +216,9 @@ char *get_header_value(const char *buffer, const char *header_key, char *output_
 
 void recieve_response(int serverfd, char *buffer)
 {
-    printf("----> Recieving Response\n");
+    pid_t pid = getpid();
+
+    
     ssize_t bytes_read; // amount of bytes read from client
     size_t total_recieved = 0;
     char header_buffer[BUFFER_SIZE];
@@ -220,15 +235,18 @@ void recieve_response(int serverfd, char *buffer)
 
         if (bytes_read <= 0)
         {
-            perror("    - error or premature disconnect during header read");
+            printf("[PID %i] - ❌ (4/5) error or premature disconnect during header read\n", pid);
             return;
         }
+
+        
 
         total_recieved += bytes_read;
         header_buffer[total_recieved] = '\0';
 
         if ((body_start = strstr(header_buffer, header_end)) != NULL)
         {
+            printf("[PID %i] - ✔️ (4/5) recieved HTTP response header\n", pid);
             break; // have read the last header
         }
     }
@@ -239,25 +257,25 @@ void recieve_response(int serverfd, char *buffer)
         int content_len = content_length(header_buffer);
         if (content_len < 0)
         {
-            perror("    - Error: Could not determine Content-Length. Cannot reliably save file body\n");
+            printf("[PID %i] - Error: Could not determine Content-Length. Cannot reliably save file body\n", pid);
             return;
         }
 
         if (!get_header_value(header_buffer, "File-Name", file_name_output, sizeof(file_name_output)))
         {
-            printf("    - Warning: 'File-Name' header not found. Using default filename: %s\n", default_file_name);
+            printf("[PID %i] - Warning: 'File-Name' header not found. using default filename: %s\n", pid, default_file_name);
             strncpy(file_name_output, default_file_name, sizeof(file_name_output));
         }
 
         body_start += strlen(header_end);
 
         size_t body_bytes_in_buff = total_recieved - (body_start - header_buffer);
-
+        
         save_file(body_bytes_in_buff, body_start, content_len, file_name_output, serverfd);
     }
     else
     {
-        printf("    - Failed to find end of HTTP headers (\\r\\n\\r\\n)");
+        printf("[PID %i] - failed to find end of HTTP headers (\\r\\n\\r\\n)\n", pid);
     }
 
     // while ((bytes_read = recv(serverfd, buffer, BUFFER_SIZE - 1, 0)) > 0){
@@ -274,7 +292,8 @@ void recieve_response(int serverfd, char *buffer)
 
 void send_request(int sockfd, const char request[])
 {
-    printf("----> Sending HTTP Request\n");
+    pid_t pid = getpid();
+
     size_t len = strlen(request);
     ssize_t bytes_sent;
     char resp_buffer[BUFFER_SIZE];
@@ -284,16 +303,16 @@ void send_request(int sockfd, const char request[])
     // check for errors and handle partial sends
     if (bytes_sent == (ssize_t)len)
     {
-        printf("    - message sent (%zd bytes)\n\n", bytes_sent);
+        printf("[PID %i] - ✔️ (3/5) message sent (%zd bytes)\n", pid, bytes_sent);
     }
     else if (bytes_sent < 0)
     {
-        perror("    - error sending message\n");
+        printf("[PID %i] - ❌ (3/5) error sending message\n", pid);
     }
     else
     {
         // if bytes_sent > 0 but less than len, a partial send occurred
-        printf("    - warning: only sent %zd of %zu bytes.\n\n", bytes_sent, len);
+        printf("[PID %i] - ⚠️ (3/5) warning: only sent %zd of %zu bytes.\n", pid, bytes_sent, len);
     }
 
     recieve_response(sockfd, resp_buffer);
