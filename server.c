@@ -451,6 +451,18 @@ int is_valid_method(char *method){
     return 0;
 }
 
+int is_valid_version(char *version){
+    const char *versions = {"HTTP/1.1"}; // supported versions
+    int i;
+
+    for (i = 0; i < (sizeof(*versions)/sizeof(versions[i])); i++){
+        if (strcmp(&(versions[i]), version) == 0){
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /**
  * @brief Parses the request line of the HTTP request.
  *
@@ -468,14 +480,9 @@ int parse_request_line(const char *line, HTTPRequest *rq)
         return -1;
     }
 
-    if (!is_valid_method(rq -> method)){
+    if (!is_valid_method(rq -> method) || !is_valid_version(rq -> version)){
         return -1;
     }
-
-    printf("PARSED START LINE:\n");
-    printf("Method: %s\n", rq->method);
-    printf("Path: %s\n", rq->path);
-    printf("Version: %s\n", rq->version);
 
     return 0;
 }
@@ -611,7 +618,10 @@ void send_error_response(const char *filepath, int clientfd, int status_code)
     {
         sprintf(response, "HTTP/1.1 500 Internal Server Error\r\n");
     }
-    send(clientfd, response, strlen(response), 0);
+
+    if (send(clientfd, response, strlen(response), 0) < 0){
+        printf(" ❌ Error sending error message.");
+    }
 }
 
 /**

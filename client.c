@@ -6,9 +6,8 @@
 void send_request(int sockfd, const char request[]);
 int connect_client(int clientfd, struct sockaddr_in server_addr);
 
-
 int main(int argc, char *argv[])
-{ 
+{
     pid_t pid = getpid();
     printf("[PID %d] - client process started.\n", pid);
 
@@ -16,7 +15,7 @@ int main(int argc, char *argv[])
     // client is only responsible for sending over bytes. server must parse message once recieved
     const char message[] =
         //"GET www/HTTPSlides.png HTTP/1.1\r\n" the www should be handled on the server side ARR
-        "GET /HTTPSlides.png HTTP/1.1\r\n"
+        "GET /indexhtml HTTP/1.1\r\n"
         "Host: 127.0.0.1:6767\r\n"
         "Connection: close\r\n"
         "\r\n";
@@ -59,7 +58,7 @@ int client_socket(uint16_t port, struct sockaddr_in server_addr)
     printf("[PID %i] - ✔️ (1/5) client socket creation successful\n", pid);
 
     if (connect_client(clientfd, server_addr) != 0)
-    { 
+    {
         return -1;
     }
 
@@ -214,12 +213,23 @@ char *get_header_value(const char *buffer, const char *header_key, char *output_
     return output_buffer;
 }
 
-void recieve_response(int serverfd, char *buffer)
+int get_status_code(char *buffer)
 {
     pid_t pid = getpid();
 
-    
-    ssize_t bytes_read; // amount of bytes read from client
+    int status_code = 0;
+    if (sscanf(buffer, "HTTP/1.%*d %d", &status_code) != 1)
+    {
+        printf("[PID %i] - ❌ Failed to parse HTTP status line.\n", pid);
+    }
+    return status_code;
+}
+
+void recieve_response(int serverfd)
+{
+    pid_t pid = getpid();
+
+    ssize_t bytes_read = 0; // amount of bytes read from client
     size_t total_recieved = 0;
     char header_buffer[BUFFER_SIZE];
     char *body_start = NULL;
@@ -236,10 +246,15 @@ void recieve_response(int serverfd, char *buffer)
         if (bytes_read <= 0)
         {
             printf("[PID %i] - ❌ (4/5) error or premature disconnect during header read\n", pid);
+
+            if (total_recieved > 0)
+            {
+                // Ensure the buffer is null-terminated and print the raw header data
+                header_buffer[total_recieved] = '\0';
+                printf("[PID %i] - ⚠️ server response: %s", pid, header_buffer);
+            }
             return;
         }
-
-        
 
         total_recieved += bytes_read;
         header_buffer[total_recieved] = '\0';
@@ -250,6 +265,20 @@ void recieve_response(int serverfd, char *buffer)
             break; // have read the last header
         }
     }
+
+    // int status_code = get_status_code(header_buffer);
+    // if (status_code != 1){
+    //     printf("[PID %i] - ❌ Failed to parse HTTP status line.\n", pid);
+    // }
+    // if (status_code <= 400){
+    //     printf("[PID %i] - ❌ server returned error code %d.", pid, status_code);
+
+    //     if(body_start != NULL){
+    //         *body_start = '\0';
+    //     }
+    //     printf("[PID %i] Headers:\n---\n%s---\n", pid, header_buffer);
+    //     return;
+    // }
 
     if (body_start != NULL)
     {
@@ -270,7 +299,7 @@ void recieve_response(int serverfd, char *buffer)
         body_start += strlen(header_end);
 
         size_t body_bytes_in_buff = total_recieved - (body_start - header_buffer);
-        
+
         save_file(body_bytes_in_buff, body_start, content_len, file_name_output, serverfd);
     }
     else
@@ -296,7 +325,6 @@ void send_request(int sockfd, const char request[])
 
     size_t len = strlen(request);
     ssize_t bytes_sent;
-    char resp_buffer[BUFFER_SIZE];
 
     bytes_sent = send(sockfd, request, len, 0);
 
@@ -315,7 +343,7 @@ void send_request(int sockfd, const char request[])
         printf("[PID %i] - ⚠️ (3/5) warning: only sent %zd of %zu bytes.\n", pid, bytes_sent, len);
     }
 
-    recieve_response(sockfd, resp_buffer);
+    recieve_response(sockfd);
 
     close(sockfd);
 }
