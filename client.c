@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     // client is only responsible for sending over bytes. server must parse message once recieved
     const char message[] =
         //"GET www/HTTPSlides.png HTTP/1.1\r\n" the www should be handled on the server side ARR
-        "GET /indexhtml HTTP/1.1\r\n"
+        "GET /A6.pdf HTTP/1.1\r\n"
         "Host: 127.0.0.1:6767\r\n"
         "Connection: close\r\n"
         "\r\n";
@@ -266,20 +266,6 @@ void recieve_response(int serverfd)
         }
     }
 
-    // int status_code = get_status_code(header_buffer);
-    // if (status_code != 1){
-    //     printf("[PID %i] - ❌ Failed to parse HTTP status line.\n", pid);
-    // }
-    // if (status_code <= 400){
-    //     printf("[PID %i] - ❌ server returned error code %d.", pid, status_code);
-
-    //     if(body_start != NULL){
-    //         *body_start = '\0';
-    //     }
-    //     printf("[PID %i] Headers:\n---\n%s---\n", pid, header_buffer);
-    //     return;
-    // }
-
     if (body_start != NULL)
     {
         *body_start = '\0'; // null termiante body start for easy reading
@@ -306,17 +292,6 @@ void recieve_response(int serverfd)
     {
         printf("[PID %i] - failed to find end of HTTP headers (\\r\\n\\r\\n)\n", pid);
     }
-
-    // while ((bytes_read = recv(serverfd, buffer, BUFFER_SIZE - 1, 0)) > 0){
-    //     buffer[bytes_read] = '\0';
-    //     print_response(buffer);
-    // }
-
-    // if (bytes_read < 0){
-    //     perror("recv failed");
-    // }
-
-    // must write response to appropriate file type and save to client_req
 }
 
 void send_request(int sockfd, const char request[])

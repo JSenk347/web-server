@@ -376,6 +376,21 @@ void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value
 
     HASH_ADD_STR(*headers, key, s);
 }
+/**
+ * @brief Cleans the entire HTTP Request, replacing '\r' with ' ',
+ *        so that we can send HTTP requests with netcat. Also just makes
+ *        handling of requests more flexible.
+ * @param buffer The buffer that holds the request
+ */
+void clean_request(char *buffer){
+    int i;
+
+    for (i = 0; buffer[i] == '\0'; i++){
+        if (buffer[i] == '\r'){
+            buffer[i] = ' ';
+        }
+    }
+}
 
 /**
  * @brief Parse the http request in buffer and populate HTTPRequest and
@@ -397,7 +412,9 @@ int parse_request(const char *buffer, HTTPRequest *rq)
 
     char *line_token, *saveptr_line;
 
-    line_token = strtok_r(buffer_copy, "\r\n", &saveptr_line); // get first line
+    clean_request(buffer_copy);
+
+    line_token = strtok_r(buffer_copy, "\n", &saveptr_line); // get first line
 
     // Check for empty request
     if (line_token == NULL)
@@ -416,7 +433,7 @@ int parse_request(const char *buffer, HTTPRequest *rq)
     }
 
     // Parse headers
-    while ((line_token = strtok_r(NULL, "\r\n", &saveptr_line)) != NULL)
+    while ((line_token = strtok_r(NULL, "\n", &saveptr_line)) != NULL)
     {
         parse_single_header(line_token, rq);
     }
@@ -748,8 +765,7 @@ const char *get_mime_type(const char *filepath)
     {
         return "application/json";
     }
-    // Add more types as needed
-    return "application/octet-stream"; // Fallback
+    return "application/octet-stream"; // fallback
 }
 
 /**
