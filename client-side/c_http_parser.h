@@ -1,7 +1,7 @@
 #ifndef C_HTTP_PARSER_H
 #define C_HTTP_PARSER_H
 
-#define FILE_NAME_LEN 32
+#define FILE_NAME_LEN /*32 too short*/ 256
 #define BUFFER_SIZE 1024
 
 #include <stdio.h>
