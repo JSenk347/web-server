@@ -1,32 +1,39 @@
 CC = gcc
-
-# 
 CFLAGS = -Wall -g
-
-# libraries to link (pthreads and lrt for semaphores)
 LDFLAGS = -lpthread -lrt
 
-# Default target: build both server and client
+# Project Directories
+SERVER_DIR = server-side
+CLIENT_DIR = client-side
+
+# Object Files Required for Linking
+SERVER_OBJS = $(SERVER_DIR)/server.o $(SERVER_DIR)/http_parser.o $(SERVER_DIR)/thread_pool.o
+CLIENT_OBJS = $(CLIENT_DIR)/client.o $(CLIENT_DIR)/c_http_parser.o
+
+# Main Targets
 all: server client
 
-# --- SERVER BUILD ---
-server: server.o common.o
-	$(CC) $(CFLAGS) server.o common.o -o server $(LDFLAGS)
+server: $(SERVER_OBJS)
+	$(CC) $(CFLAGS) $(SERVER_OBJS) -o server $(LDFLAGS)
 
-server.o: server.c server.h common.h
-	$(CC) $(CFLAGS) -c server.c
+client: $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) $(CLIENT_OBJS) -o client
 
-# --- CLIENT BUILD ---
-client: client.o common.o
-	$(CC) $(CFLAGS) client.o common.o -o client
+# The symbols used in the action below mean:
+#   $< = The name of the prerequisite source file (e.g., server-side/server.c)
+#   $@ = The name of the target object file (e.g., server-side/server.o)
+$(SERVER_DIR)/%.o: $(SERVER_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-client.o: client.c common.h
-	$(CC) $(CFLAGS) -c client.c
+$(CLIENT_DIR)/%.o: $(CLIENT_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# --- COMMON BUILD ---
-common.o: common.c common.h
-	$(CC) $(CFLAGS) -c common.c
+# --- CLEANUP ---
+clean:
+	rm -f server client $(SERVER_DIR)/*.o $(CLIENT_DIR)/*.o
 
-# --- CLEAN UP ---
-clean: 
-	rm -f client client.o server server.o common.o
+
+
+
+
+
