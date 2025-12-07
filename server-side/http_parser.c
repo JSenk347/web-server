@@ -314,6 +314,9 @@ void parse_single_header(char *line, HTTPRequest *rq)
  */
 void handle_request(int clientfd, const char *buffer)
 {
+    pthread_mutex_lock(&stats_mutex);   
+    total_requests++; 
+    pthread_mutex_unlock(&stats_mutex); 
     HTTPRequest rq;
     /*
     MUST be initialized to NULL to indicate an empty hash table.
@@ -329,11 +332,41 @@ void handle_request(int clientfd, const char *buffer)
         send_error_response("Request Parsing", clientfd, status);
         return;
     }
+    if (strcmp(rq.path, "/stats") == 0)
+    {
+        char response[1024];
+        char body[512];
+        pthread_mutex_lock(&stats_mutex);
+        int current_total = total_requests;
+        int current_queue = queue_count;
+        pthread_mutex_unlock(&stats_mutex);
+        // Build the HTML body with your variables
+        // Note: Make sure 'total_requests' and 'queue_count' are accessible here (globals)
+        sprintf(body, "<html>"
+                      "<head><meta http-equiv=\"refresh\" content=\"1\"></head>"
+                      "<body>"
+                      "<h1>Server Status Dashboard</h1>"
+                      "<p><strong>Active Worker Threads:</strong> %d</p>"
+                      "<p><strong>Current Queue Size:</strong> %d</p>"
+                      "<p><strong>Total Requests Served:</strong> %d</p>" 
+                      "</body></html>", 
+                      NUM_THREADS, current_queue, current_total);
 
+        // Build the HTTP Header + Body
+        sprintf(response, "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: text/html\r\n"
+                          "Content-Length: %ld\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s", strlen(body), body);
+        send(clientfd, response, strlen(response), 0);
+        delete_all_headers(&rq.headers); 
+        return;
+    }
     // double the PATH_LEN to accommodate full file paths without overflow risk
     char filepath[PATH_LEN * 2];
     create_root_path(filepath, &rq);
-
+    
     // error check for bad request
     if (strcmp(filepath, "invalid_path") == 0)
     {
