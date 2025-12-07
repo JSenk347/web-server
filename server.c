@@ -16,6 +16,9 @@ pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // The Lock
 pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;    // Logging Lock
 pthread_cond_t queue_cond_var = PTHREAD_COND_INITIALIZER; // The "Wake Up" Signal
 
+// --- STATISTICS GLOBALS ---
+int total_requests = 0;
+pthread_mutex_t stats_mutex = PTHREAD_MUTEX_INITIALIZER;
 // The Queue (Circular Buffer)
 int socket_queue[MAX_SOCKETS]; // Queue of clientfile descriptors
 int queue_head = 0;
@@ -520,6 +523,9 @@ void parse_single_header(char *line, HTTPRequest *rq)
  */
 void handle_request(int clientfd, const char *buffer)
 {
+    pthread_mutex_lock(&stats_mutex);   
+    total_requests++; 
+    pthread_mutex_unlock(&stats_mutex); 
     HTTPRequest rq;
     /*
     MUST be initialized to NULL to indicate an empty hash table.
@@ -528,6 +534,7 @@ void handle_request(int clientfd, const char *buffer)
     */
     rq.headers = NULL; // ptr to head of HTTPHeader hash table
 
+
     int status = parse_request(buffer, &rq); // parse client request
     // error check
     if (status != 200)
@@ -535,7 +542,37 @@ void handle_request(int clientfd, const char *buffer)
         send_error_response("Request Parsing", clientfd, status);
         return;
     }
+    if (strcmp(rq.path, "/stats") == 0)
+    {
+        char response[1024];
+        char body[512];
+        pthread_mutex_lock(&stats_mutex);
+        int current_total = total_requests;
+        int current_queue = queue_count;
+        pthread_mutex_unlock(&stats_mutex);
+        // Build the HTML body with your variables
+        // Note: Make sure 'total_requests' and 'queue_count' are accessible here (globals)
+        sprintf(body, "<html>"
+                      "<head><meta http-equiv=\"refresh\" content=\"1\"></head>"
+                      "<body>"
+                      "<h1>Server Status Dashboard</h1>"
+                      "<p><strong>Active Worker Threads:</strong> %d</p>"
+                      "<p><strong>Current Queue Size:</strong> %d</p>"
+                      "<p><strong>Total Requests Served:</strong> %d</p>" 
+                      "</body></html>", 
+                      NUM_THREADS, current_queue, current_total);
 
+        // Build the HTTP Header + Body
+        sprintf(response, "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: text/html\r\n"
+                          "Content-Length: %ld\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s", strlen(body), body);
+        send(clientfd, response, strlen(response), 0);
+        delete_all_headers(&rq.headers); 
+        return;
+    }
     // double the PATH_LEN to accommodate full file paths without overflow risk
     char filepath[PATH_LEN * 2];
     create_root_path(filepath, &rq);
