@@ -3,7 +3,8 @@
 #include "../lib/uthash.h"
 
 #include <sys/stat.h>
-
+int total_requests = 0;
+pthread_mutex_t stats_mutex = PTHREAD_MUTEX_INITIALIZER;
 // --- HTTP structures ---
 typedef struct HTTPHeader
 {
