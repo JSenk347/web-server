@@ -1,8 +1,8 @@
 #include "http_parser.h"
 #include "thread_pool.h"
 #include "../lib/uthash.h"
-
 #include <sys/stat.h>
+// Mutex for stats page
 int total_requests = 0;
 pthread_mutex_t stats_mutex = PTHREAD_MUTEX_INITIALIZER;
 // --- HTTP structures ---
@@ -333,35 +333,92 @@ void handle_request(int clientfd, const char *buffer)
         send_error_response("Request Parsing", clientfd, status);
         return;
     }
-    if (strcmp(rq.path, "/stats") == 0)
+    if (strcmp(rq.path, "/api/stats") == 0)
     {
         char response[1024];
-        char body[512];
+        char body[256];
+
         pthread_mutex_lock(&stats_mutex);
         int current_total = total_requests;
         int current_queue = queue_count;
         pthread_mutex_unlock(&stats_mutex);
-        // Build the HTML body with your variables
-        // Note: Make sure 'total_requests' and 'queue_count' are accessible here (globals)
-        sprintf(body, "<html>"
-                      "<head><meta http-equiv=\"refresh\" content=\"1\"></head>"
-                      "<body>"
-                      "<h1>Server Status Dashboard</h1>"
-                      "<p><strong>Active Worker Threads:</strong> %d</p>"
-                      "<p><strong>Current Queue Size:</strong> %d</p>"
-                      "<p><strong>Total Requests Served:</strong> %d</p>" 
-                      "</body></html>", 
-                      NUM_THREADS, current_queue, current_total);
 
-        // Build the HTTP Header + Body
+        // Create JSON (JavaScript Object Notation)
+        sprintf(body, "{\"active\": %d, \"queue\": %d, \"total\": %d}", 
+                NUM_THREADS, current_queue, current_total);
+
+        sprintf(response, "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: application/json\r\n"
+                          "Content-Length: %ld\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s", strlen(body), body);
+
+        send(clientfd, response, strlen(response), 0);
+        delete_all_headers(&rq.headers);
+        return;
+    }
+    if (strcmp(rq.path, "/stats") == 0)
+    {
+        // WARNING: We need a bigger buffer for all this HTML/CSS!
+        char response[4096]; 
+        char body[3072]; 
+
+        sprintf(body, 
+            "<html><head>"
+            "<title>Server Dashboard</title>"
+            "<style>"
+            "  body { font-family: 'Segoe UI', sans-serif; background-color: #1e1e2e; color: #cdd6f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }"
+            "  .card { background-color: #313244; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; width: 350px; }"
+            "  h1 { font-size: 24px; margin-bottom: 20px; color: #89b4fa; }"
+            "  .stat-box { background-color: #45475a; padding: 15px; border-radius: 8px; margin: 10px 0; }"
+            "  .stat-label { font-size: 14px; color: #a6adc8; }"
+            "  .stat-value { font-size: 28px; font-weight: bold; color: #a6e3a1; }"
+            "  .footer { margin-top: 20px; font-size: 12px; color: #6c7086; }"
+            "</style>"
+            "</head><body>"
+            
+            "<div class='card'>"
+            "  <h1> Server Status</h1>"
+            "  <div class='stat-box'>"
+            "    <div class='stat-label'>Active Workers</div>"
+            "    <div class='stat-value' id='active'>-</div>"
+            "  </div>"
+            "  <div class='stat-box'>"
+            "    <div class='stat-label'>Queue Size</div>"
+            "    <div class='stat-value' id='queue'>-</div>"
+            "  </div>"
+            "  <div class='stat-box'>"
+            "    <div class='stat-label'>Total Requests</div>"
+            "    <div class='stat-value' id='total'>-</div>"
+            "  </div>"
+            "  <div class='footer'>Updates automatically every 500ms</div>"
+            "</div>"
+
+            "<script>"
+            "  function updateStats() {"
+            "    fetch('/api/stats')"  // Call our new API
+            "      .then(response => response.json())"
+            "      .then(data => {"
+            "        document.getElementById('active').innerText = data.active;"
+            "        document.getElementById('queue').innerText = data.queue;"
+            "        document.getElementById('total').innerText = data.total;"
+            "      });"
+            "  }"
+            "  setInterval(updateStats, 500);" // Run every 0.5 seconds
+            "  updateStats();" // Run immediately on load
+            "</script>"
+            "</body></html>");
+
         sprintf(response, "HTTP/1.1 200 OK\r\n"
                           "Content-Type: text/html\r\n"
                           "Content-Length: %ld\r\n"
                           "Connection: close\r\n"
                           "\r\n"
                           "%s", strlen(body), body);
+
         send(clientfd, response, strlen(response), 0);
-        delete_all_headers(&rq.headers); 
+        delete_all_headers(&rq.headers);
         return;
     }
     // double the PATH_LEN to accommodate full file paths without overflow risk
