@@ -1,3 +1,9 @@
+/**
+ * Summary: Header file defining thread pool interfaces, queue management, and logging prototypes.
+ *
+ * @file thread_pool.h
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #ifndef THREAD_POOL_H
 #define THREAD_POOL_H
 

@@ -1,3 +1,9 @@
+/**
+ * Summary: Main client application for initiating HTTP requests and handling connection lifecycle.
+ *
+ * @file client.c
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #include "c_http_parser.h"
 
 #include <unistd.h>
@@ -8,12 +14,22 @@
 
 #define PORT 6767
 
+// --- FUNCTION DECLERATIONS ---
 int client_socket(uint16_t port, struct sockaddr_in server_addr);
 int connect_client(int clientfd, struct sockaddr_in server_addr);
-//int save_file(size_t body_bytes, char *body_start, int content_len, char *file_name, int sockfd);
 int content_length(const char *buffer);
 
-int main(int argc, char *argv[])
+// -- FUNCTIONS ---
+/**
+ * @brief Main entry point for the client application.
+ *        Facilitates the client lifecycle:
+ *        1. Defines the hardcoded HTTP request string (Method, Path, Host)
+ *        2. Initializes the socket connection via client_socket
+ *        3. Sends the request and awaits the response via send_request()
+ *        4. Logs process start and finish times using the process ID (PID) for tracing
+ * @return 0 on successful execution, -1 if socket creation fails.
+ */
+int main()
 {
     pid_t pid = getpid();
     printf("[PID %d] - client process started.\n", pid);
@@ -28,17 +44,28 @@ int main(int argc, char *argv[])
         "\r\n";
 
     struct sockaddr_in server_addr;
-    int clientfd = client_socket(PORT, server_addr);
-    if (clientfd < 0)
+    int serverfd = client_socket(PORT, server_addr);
+    if (serverfd < 0)
     {
         return -1;
     }
-    send_request(clientfd, message);
+    send_request(serverfd, message);
 
     printf("[PID %i] - client process finished.\n", pid);
     return 0;
 }
 
+/**
+ * @brief Creates and configures a TCP client socket.
+ *        Creates a socket file descriptor using IPv4 and TCP (SOCK_STREAM).
+ *        It populates the server_addr structure with the target family, port, and IP address.
+ *        It also converts the string IP ("127.0.0.1") to binary network format using inet_pton().
+ *        It attempts to connect to the server using connect_client().
+ *
+ * @param port Port number to connect to (host byte order)
+ * @param server_addr sockaddr_in structure to be populated with server details
+ * @return Socket file descriptor on success, or -1 on failure
+ */
 int client_socket(uint16_t port, struct sockaddr_in server_addr)
 {
     pid_t pid = getpid();
@@ -72,6 +99,15 @@ int client_socket(uint16_t port, struct sockaddr_in server_addr)
     return clientfd;
 }
 
+/**
+ * @brief Establishes a connection to the server using the configured socket.
+ *        This function calls the connect() syscall to initiate the TCP 3-way handshake
+ *        with the server specified in the server_addr structure. It provides logging
+ *        for successful or failed connection attempts.
+ * @param clientfd The socket file descriptor to connect
+ * @param server_addr Structure containing the server's IP and port
+ * @return 0 on success, -1 on failure.
+ */
 int connect_client(int clientfd, struct sockaddr_in server_addr)
 {
     pid_t pid = getpid();

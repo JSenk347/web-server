@@ -1,10 +1,16 @@
+/**
+ * Summary: Implementation of HTTP protocol parsing, header manipulation, and file serving logic.
+ *
+ * @file http_parser.c
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #include "http_parser.h"
 #include "thread_pool.h"
 #include "../lib/uthash.h"
 
 #include <sys/stat.h>
 
-// --- HTTP structures ---
+// --- HTTP STRUCTURES ---
 typedef struct HTTPHeader
 {
     char key[64]; // header name such as "Host" or "Content Type"
@@ -20,6 +26,7 @@ typedef struct HTTPRequest
     HTTPHeader *headers; // pointer to head of the HTTPHeader hash table
 } HTTPRequest;
 
+// --- FUNCTION DECLERATIONS ---
 void create_root_path(char *filepath, HTTPRequest *rq);
 void delete_all_headers(HTTPHeader **headers);
 void add_header_to_hash(HTTPHeader **headers, const char *key, const char *value);
@@ -34,6 +41,7 @@ void send_error_response(const char *filepath, int clientfd, int status_code);
 void serve_file(int clientfd, const char *filepath, off_t filesize);
 const char *get_mime_type(const char *filepath);
 
+// --- FUNCTIONS ---
 /**
  * @brief Creates the full file path for the requested resource.
  *
@@ -42,7 +50,7 @@ const char *get_mime_type(const char *filepath);
  */
 void create_root_path(char *filepath, HTTPRequest *rq)
 {
-    // Security check to block access to www parent folders
+    // security check to block access to www parent folders
     if (strstr(rq->path, "..") != NULL)
     {
         sprintf(filepath, "invalid_path");
@@ -54,7 +62,7 @@ void create_root_path(char *filepath, HTTPRequest *rq)
     {
         sprintf(filepath, "www/index.html");
 
-        printf("Handling request for path: %s\n", rq->path);
+        printf(" - handling request for path: %s\n", rq->path);
     } // construct full file path
     else
     {
@@ -81,37 +89,16 @@ ssize_t receive_message(int clientfd, char *buffer)
     }
     else if (bytes_read == 0)
     {
-        printf("client disconnected");
+        printf(" - client disconnected");
         return 0;
     }
     else
     {
         // null terminate what's in buffer so we can treat it as a c-string
         buffer[bytes_read] = '\0';
-
-        // handleRequest() will replace parseRequest
-        // parse_request(buffer);
         handle_request(clientfd, buffer);
-
-        // printf("client message: \n%s\n", buffer);
     }
     return bytes_read;
-}
-
-/**
- * @brief Deletes all headers in the HTTPHeader hash table.
- *
- * @param headers Pointer to the pointer of the head of the HTTPHeader hash table.
- */
-void delete_all_headers(HTTPHeader **headers)
-{
-    HTTPHeader *current_header, *tmp;
-
-    HASH_ITER(hh, *headers, current_header, tmp)
-    {
-        HASH_DEL(*headers, current_header);
-        free(current_header);
-    }
 }
 
 /**
@@ -164,51 +151,11 @@ void clean_request(char *buffer)
 }
 
 /**
- * @brief Parse the http request in buffer and populate HTTPRequest and
- *        HTTPHeader structures.
- *
- * @param buffer Pointer to the buffer containing the HTTP request.
- * @param rq Pointer to the HTTPRequest structure to be populated.
+ * @brief Formats and prints the provided HTTP request, including
+ *        its headers
+ * @param rq The HTTPRequest struct to print
  */
-// void parse_request(const char *buffer, HTTPRequest *rq)
-int parse_request(const char *buffer, HTTPRequest *rq)
-{
-    char *buffer_copy = strdup(buffer); // make a modifiable copy of buffer;
-    if (buffer_copy == NULL)
-    {
-        perror("strdup failed");
-        // return;
-        return 500; // internal server error
-    }
-
-    char *line_token, *saveptr_line;
-
-    clean_request(buffer_copy);
-
-    line_token = strtok_r(buffer_copy, "\n", &saveptr_line); // get first line
-
-    // Check for empty request
-    if (line_token == NULL)
-    {
-        fprintf(stderr, "malformed request: empty or missing request line.\n");
-        free(buffer_copy);
-        // return;
-        return 400; // bad request
-    }
-
-    // Parse request line
-    if (parse_request_line(line_token, rq) != 0)
-    {
-        free(buffer_copy);
-        return 400; // bad request
-    }
-
-    // Parse headers
-    while ((line_token = strtok_r(NULL, "\n", &saveptr_line)) != NULL)
-    {
-        parse_single_header(line_token, rq);
-    }
-
+void print_http_request(HTTPRequest *rq){
     printf("\n--- Parsed HTTP Request ---\n");
     printf("Method: %s\n", rq->method);
     printf("Path: %s\n", rq->path);
@@ -221,40 +168,50 @@ int parse_request(const char *buffer, HTTPRequest *rq)
         printf(" - %s: %s\n", current_header->key, current_header->value);
     }
     printf("---------------------------\n");
-
-    // Clean up allocated hash table memory
-    free(buffer_copy); // Free the writable copy
-    return 200;        // Ok
 }
 
-int is_valid_method(char *method)
+/**
+ * @brief Parse the http request in buffer and populate HTTPRequest and
+ *        HTTPHeader structures.
+ *
+ * @param buffer Pointer to the buffer containing the HTTP request.
+ * @param rq Pointer to the HTTPRequest structure to be populated.
+ */
+int parse_request(const char *buffer, HTTPRequest *rq)
 {
-    const char *methods = {"GET"};
-    int i;
-
-    for (i = 0; i < (sizeof(*methods) / sizeof(methods[i])); i++)
+    char *buffer_copy = strdup(buffer); // make a modifiable copy of buffer;
+    if (buffer_copy == NULL)
     {
-        if (strcmp(&(methods[i]), method) == 0)
-        {
-            return 1;
-        }
+        printf(" - ❌ Error: strdup() failed");
+        return 500; // internal server error
     }
-    return 0;
-}
 
-int is_valid_version(char *version)
-{
-    const char *versions = {"HTTP/1.1"}; // supported versions
-    int i;
+    char *line_token, *saveptr_line;
+    clean_request(buffer_copy);
+    line_token = strtok_r(buffer_copy, "\n", &saveptr_line); // get first line
 
-    for (i = 0; i < (sizeof(*versions) / sizeof(versions[i])); i++)
+    if (line_token == NULL) // check for empty request
     {
-        if (strcmp(&(versions[i]), version) == 0)
-        {
-            return 1;
-        }
+        fprintf(stderr, "malformed request: empty or missing request line.\n");
+        free(buffer_copy);
+        return 400; // bad request
     }
-    return 0;
+
+    if (parse_request_line(line_token, rq) != 0) // parse request line, return 400 if parsing failed
+    {
+        free(buffer_copy);
+        return 400; // bad request
+    }
+
+    while ((line_token = strtok_r(NULL, "\n", &saveptr_line)) != NULL) // Parse headers
+    {
+        parse_single_header(line_token, rq);
+    }
+
+    print_http_request(rq);
+
+    free(buffer_copy); // free writable copy of the http request buffer
+    return 200;        // status = ok
 }
 
 /**
@@ -292,7 +249,7 @@ void parse_single_header(char *line, HTTPRequest *rq)
 {
     char *key = line;
 
-    // searches for first occurence of ":" in line_token and returns pointer to
+    // strchr() searches for first occurence of ":" in line_token and returns pointer to
     // location in array
     char *value = strchr(line, ':');
 
@@ -307,7 +264,7 @@ void parse_single_header(char *line, HTTPRequest *rq)
 
 /**
  * @brief Parses and handles the requests received from the client.
- *          So far, only handles HTTP requests.
+ *        Only handles HTTP requests.
  *
  * @param clientfd The client socket file descriptor.
  * @param buffer Pointer to the buffer containing the received HTTP request.
@@ -317,21 +274,18 @@ void handle_request(int clientfd, const char *buffer)
     HTTPRequest rq;
     /*
     MUST be initialized to NULL to indicate an empty hash table.
-    When adding headers, we will use uthash macros which will handle
-    the hash table management for us.
+    When adding headers, uthash macros handle hash table management.
     */
     rq.headers = NULL; // ptr to head of HTTPHeader hash table
-
     int status = parse_request(buffer, &rq); // parse client request
-    // error check
-    if (status != 200)
+    
+    if (status != 200)// error check
     {
         send_error_response("Request Parsing", clientfd, status);
         return;
     }
 
-    // double the PATH_LEN to accommodate full file paths without overflow risk
-    char filepath[PATH_LEN * 2];
+    char filepath[PATH_LEN];
     create_root_path(filepath, &rq);
 
     // error check for bad request
@@ -343,19 +297,14 @@ void handle_request(int clientfd, const char *buffer)
 
     struct stat file_stat; // will contain info about the file
 
-    // If file doesn't exist
+    // "if file doesn't exist...""
     if (stat(filepath, &file_stat) < 0)
     {
-        // writes states about what's at filepath to filestat
-        send_error_response(filepath, clientfd, 404);
-    }
-    // If file exists
-    else
-    {
+        send_error_response(filepath, clientfd, 404); // writes states about what's at filepath to filestat
+    } else {
         serve_file(clientfd, filepath, file_stat.st_size);
     }
     delete_all_headers(&rq.headers); // clean up allocated hash table memory
-    // JD close(clientfd);                 // might not be needed
 }
 
 /**
@@ -388,12 +337,12 @@ void send_error_response(const char *filepath, int clientfd, int status_code)
 
     if (send(clientfd, response, strlen(response), 0) < 0)
     {
-        printf(" ❌ Error sending error message.\n");
+        printf(" - ❌ Error sending error message.\n");
     }
 }
 
 /**
- * @brief Serves the requested file to the client.
+ * @brief Prepares and sends the requested resource to the client.
  *
  * @param clientfd The client socket file descriptor.
  * @param filepath The path of the file to be served.
@@ -423,7 +372,7 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
         file_name = (char *)filepath; // fallback if no slashes found
     }
 
-    // Build header
+    // build header
     sprintf(header, "HTTP/1.1 200 OK\r\n"
                     "File-Name: %s\r\n"
                     "Content-Length: %ld\r\n"
@@ -431,7 +380,7 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
                     "\r\n",
             file_name, filesize, mime_type);
 
-    // Send Header
+    // send header
     if (send(clientfd, header, strlen(header), 0) == -1)
     {
         perror("Failed to send header\n");
@@ -439,7 +388,7 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
         return;
     }
 
-    // Send Body
+    // send body
     char file_buffer[BUFFER_SIZE];
     size_t bytes_read;
     while ((bytes_read = fread(file_buffer, 1, sizeof(file_buffer), file)) > 0)
@@ -454,9 +403,9 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
 
     fclose(file);
     log_request(clientfd, "GET", (char *)filepath, 200); // safely prints here instead
-    // printf("Served file: %s\n", filepath);
 }
 
+// --- HELPER FUNCTIONS ---
 /**
  * @brief Determines the MIME type based on the file extension.
  *
@@ -472,8 +421,7 @@ const char *get_mime_type(const char *filepath)
         return "application/octet-stream"; // default for unknown/no extension
     }
 
-    // skip the dot
-    ext++;
+    ext++; // skip the dot
 
     if (strcmp(ext, "html") == 0 || strcmp(ext, "htm") == 0)
     {
@@ -504,4 +452,60 @@ const char *get_mime_type(const char *filepath)
         return "application/json";
     }
     return "application/octet-stream"; // fallback
+}
+
+/**
+ * @brief Deletes all headers in the HTTPHeader hash table.
+ *
+ * @param headers Pointer to the pointer of the head of the HTTPHeader hash table.
+ */
+void delete_all_headers(HTTPHeader **headers)
+{
+    HTTPHeader *current_header, *tmp;
+
+    HASH_ITER(hh, *headers, current_header, tmp)
+    {
+        HASH_DEL(*headers, current_header);
+        free(current_header);
+    }
+}
+
+/**
+ * @brief Returns whether or not the passed method is a supported HTTP
+ *        method or not
+ * @param method Pointer to the string containing the method
+ */
+int is_valid_method(char *method)
+{
+    const char *methods = {"GET"}; // supported http verbs
+    int i;
+
+    for (i = 0; i < (sizeof(*methods) / sizeof(methods[i])); i++)
+    {
+        if (strcmp(&(methods[i]), method) == 0)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**
+ * @brief Returns whether or not the passed version is one of the 
+ *        HTTP versions we support
+ * @param version Pointer to the string containing the verison
+ */
+int is_valid_version(char *version)
+{
+    const char *versions = {"HTTP/1.1"}; // supported versions
+    int i;
+
+    for (i = 0; i < (sizeof(*versions) / sizeof(versions[i])); i++)
+    {
+        if (strcmp(&(versions[i]), version) == 0)
+        {
+            return 1;
+        }
+    }
+    return 0;
 }
