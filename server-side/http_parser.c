@@ -324,15 +324,15 @@ void send_error_response(const char *filepath, int clientfd, int status_code)
     // create response for client
     if (status_code == 400)
     {
-        sprintf(response, "HTTP/1.1 400 Bad Request\r\n");
+        sprintf(response, "HTTP/1.1 400 Bad Request ❌\r\n");
     }
     else if (status_code == 404)
     {
-        sprintf(response, "HTTP/1.1 404 Not Found\r\n");
+        sprintf(response, "HTTP/1.1 404 Not Found ❌\r\n");
     }
     else
     {
-        sprintf(response, "HTTP/1.1 500 Internal Server Error\r\n");
+        sprintf(response, "HTTP/1.1 500 Internal Server Error ❌❌\r\n");
     }
 
     if (send(clientfd, response, strlen(response), 0) < 0)
@@ -383,7 +383,7 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
     // send header
     if (send(clientfd, header, strlen(header), 0) == -1)
     {
-        perror("Failed to send header\n");
+        printf(" - ❌ Error: failed to send header\n");
         fclose(file);
         return;
     }
@@ -395,7 +395,7 @@ void serve_file(int clientfd, const char *filepath, off_t filesize)
     {
         if (send(clientfd, file_buffer, bytes_read, 0) == -1)
         {
-            printf("Failed to send file content\n");
+            printf(" - ❌ Error: failed to send file content\n");
             send_error_response(filepath, clientfd, 500);
             break;
         }

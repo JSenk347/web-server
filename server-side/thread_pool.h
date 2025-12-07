@@ -11,7 +11,7 @@
 #include <semaphore.h>
 #include <sys/stat.h>
 
-#define NUM_THREADS 4   // arbitrary number can change to w/e
+#define NUM_THREADS 4 
 #define MAX_SOCKETS 10
 #define BUFFER_SIZE 1024
 
