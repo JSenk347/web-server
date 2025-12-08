@@ -18,5 +18,5 @@
 void thread_pool();
 void enqueue(int client_socket);
 void log_request(int client_fd, char *method, const char *filepath, int status);
-
+extern int queue_count;
 #endif

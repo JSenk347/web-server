@@ -7,10 +7,11 @@
 #include "http_parser.h"
 #include "thread_pool.h"
 #include "../lib/uthash.h"
-
 #include <sys/stat.h>
-
-// --- HTTP STRUCTURES ---
+// Mutex for stats page
+int total_requests = 0;
+pthread_mutex_t stats_mutex = PTHREAD_MUTEX_INITIALIZER;
+// --- HTTP structures ---
 typedef struct HTTPHeader
 {
     char key[64]; // header name such as "Host" or "Content Type"
@@ -271,6 +272,9 @@ void parse_single_header(char *line, HTTPRequest *rq)
  */
 void handle_request(int clientfd, const char *buffer)
 {
+    pthread_mutex_lock(&stats_mutex);   
+    total_requests++; 
+    pthread_mutex_unlock(&stats_mutex); 
     HTTPRequest rq;
     /*
     MUST be initialized to NULL to indicate an empty hash table.
@@ -284,10 +288,98 @@ void handle_request(int clientfd, const char *buffer)
         send_error_response("Request Parsing", clientfd, status);
         return;
     }
+    if (strcmp(rq.path, "/api/stats") == 0)
+    {
+        char response[1024];
+        char body[256];
 
-    char filepath[PATH_LEN];
+        pthread_mutex_lock(&stats_mutex);
+        int current_total = total_requests;
+        int current_queue = queue_count;
+        pthread_mutex_unlock(&stats_mutex);
+
+        // Create JSON (JavaScript Object Notation)
+        sprintf(body, "{\"active\": %d, \"queue\": %d, \"total\": %d}", 
+                NUM_THREADS, current_queue, current_total);
+
+        sprintf(response, "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: application/json\r\n"
+                          "Content-Length: %ld\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s", strlen(body), body);
+
+        send(clientfd, response, strlen(response), 0);
+        delete_all_headers(&rq.headers);
+        return;
+    }
+    if (strcmp(rq.path, "/stats") == 0)
+    {
+        // WARNING: We need a bigger buffer for all this HTML/CSS!
+        char response[4096]; 
+        char body[3072]; 
+
+        sprintf(body, 
+            "<html><head>"
+            "<title>Server Dashboard</title>"
+            "<style>"
+            "  body { font-family: 'Segoe UI', sans-serif; background-color: #1e1e2e; color: #cdd6f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }"
+            "  .card { background-color: #313244; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; width: 350px; }"
+            "  h1 { font-size: 24px; margin-bottom: 20px; color: #89b4fa; }"
+            "  .stat-box { background-color: #45475a; padding: 15px; border-radius: 8px; margin: 10px 0; }"
+            "  .stat-label { font-size: 14px; color: #a6adc8; }"
+            "  .stat-value { font-size: 28px; font-weight: bold; color: #a6e3a1; }"
+            "  .footer { margin-top: 20px; font-size: 12px; color: #6c7086; }"
+            "</style>"
+            "</head><body>"
+            
+            "<div class='card'>"
+            "  <h1> Server Status</h1>"
+            "  <div class='stat-box'>"
+            "    <div class='stat-label'>Active Workers</div>"
+            "    <div class='stat-value' id='active'>-</div>"
+            "  </div>"
+            "  <div class='stat-box'>"
+            "    <div class='stat-label'>Queue Size</div>"
+            "    <div class='stat-value' id='queue'>-</div>"
+            "  </div>"
+            "  <div class='stat-box'>"
+            "    <div class='stat-label'>Total Requests</div>"
+            "    <div class='stat-value' id='total'>-</div>"
+            "  </div>"
+            "  <div class='footer'>Updates automatically every 500ms</div>"
+            "</div>"
+
+            "<script>"
+            "  function updateStats() {"
+            "    fetch('/api/stats')"  // Call our new API
+            "      .then(response => response.json())"
+            "      .then(data => {"
+            "        document.getElementById('active').innerText = data.active;"
+            "        document.getElementById('queue').innerText = data.queue;"
+            "        document.getElementById('total').innerText = data.total;"
+            "      });"
+            "  }"
+            "  setInterval(updateStats, 500);" // Run every 0.5 seconds
+            "  updateStats();" // Run immediately on load
+            "</script>"
+            "</body></html>");
+
+        sprintf(response, "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: text/html\r\n"
+                          "Content-Length: %ld\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s", strlen(body), body);
+
+        send(clientfd, response, strlen(response), 0);
+        delete_all_headers(&rq.headers);
+        return;
+    }
+    // double the PATH_LEN to accommodate full file paths without overflow risk
+    char filepath[PATH_LEN * 2];
     create_root_path(filepath, &rq);
-
+    
     // error check for bad request
     if (strcmp(filepath, "invalid_path") == 0)
     {
