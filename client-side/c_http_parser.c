@@ -1,3 +1,9 @@
+/**
+ * Summary: Implementation of HTTP protocol parsing, header manipulation, and file serving logic.
+ *
+ * @file http_parser.c
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #include "c_http_parser.h"
 
 #include <string.h>
@@ -5,6 +11,20 @@
 #include <stdio.h>
 #include <unistd.h>
 
+// --- FUNCTIONS ---
+/**
+ * @brief Reads the remaining bytes of the HTTP body from the socket.
+ *        This function is called after the headers and initial body chunk have been processed.
+ *        It continues to read from the socket in BUFFER_SIZE chunks until the expected
+ *        "remaining_bytes"have been received and written to the file.
+ *
+ * @param remaining_bytes # of bytes yet to be read
+ * @param total_written Pointer to a counter tracking the total bytes written to the file
+ * @param buffer A reusable buffer for storing incoming data chunks
+ * @param sockfd The socket file descriptor to read from
+ * @param outfile The file pointer where the data should be written
+ * @param file_name The name of the file being saved (for logging purposes)
+ */
 void read_remaining_body_bytes(long remaining_bytes, long *total_written, char *buffer, int sockfd, FILE *outfile, char *file_name)
 {
     pid_t pid = getpid();
@@ -29,6 +49,19 @@ void read_remaining_body_bytes(long remaining_bytes, long *total_written, char *
     }
 }
 
+/**
+ * @brief Opens the output file and initiates the saving process.
+ *        This function constructs the file path (in "client-side/client-reqs/"), opens the file
+ *        for binary writing, writes any body data already received in the header buffer, and
+ *        then calls read_remaining_body_bytes() to fetch the rest of the content.
+ *
+ * @param body_bytes # of bytes of the body that are in the header buffer
+ * @param body_start Pointer to the start of the body data in the header buffer
+ * @param content_len Total size of the file content (from Content-Length)
+ * @param file_name Name of the file to save
+ * @param sockfd The socket file descriptor
+ * @return 0 on success, or -1 if the file could not be opened.
+ */
 int save_file(size_t body_bytes, char *body_start, int content_len, char *file_name, int sockfd)
 {
     pid_t pid = getpid();
@@ -61,6 +94,11 @@ int save_file(size_t body_bytes, char *body_start, int content_len, char *file_n
     return 0;
 }
 
+/**
+ * @brief Parses the Content-Length header value from the response buffer.
+ * * @param buffer The null-terminated response header buffer.
+ * @return The content length as an integer, or -1 if the header is missing or invalid.
+ */
 int content_length(const char *buffer)
 {
     pid_t pid = getpid();
@@ -132,6 +170,11 @@ char *get_header_value(const char *buffer, const char *header_key, char *output_
     return output_buffer;
 }
 
+/**
+ * @brief Parses the HTTP status code from the status line.
+ * @param buffer The response header buffer (e.g., "HTTP/1.1 200 OK").
+ * @return The integer status code, or 0 if parsing fails.
+ */
 int get_status_code(char *buffer)
 {
     pid_t pid = getpid();
@@ -144,7 +187,13 @@ int get_status_code(char *buffer)
     return status_code;
 }
 
-void recieve_response(int serverfd)
+/**
+ * @brief Main function to handle receiving the server's response.
+ *        This function reads the response headers, checks the status code for errors,
+ *        parses metadata (like Content-Length and File-Name), and initiates file saving.
+ * @param serverfd The socket file descriptor connected to the server.
+ */
+void receive_response(int serverfd)
 {
     pid_t pid = getpid();
 
@@ -213,6 +262,11 @@ void recieve_response(int serverfd)
     }
 }
 
+/**
+ * @brief Sends the HTTP request string to the server and awaits the response.
+ * @param sockfd The socket file descriptor connected to the server.
+ * @param request The null-terminated HTTP request string.
+ */
 void send_request(int sockfd, const char request[])
 {
     pid_t pid = getpid();
@@ -237,7 +291,7 @@ void send_request(int sockfd, const char request[])
         printf("[PID %i] - ⚠️ (3/5) warning: only sent %zd of %zu bytes.\n", pid, bytes_sent, len);
     }
 
-    recieve_response(sockfd); // JS TRY PUTTING THIS LINE IN CLIENT.C MAIN LOOP AFTER SEND_REQUEST
+    receive_response(sockfd);
 
     close(sockfd);
 }

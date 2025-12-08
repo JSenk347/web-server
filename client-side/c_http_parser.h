@@ -1,7 +1,13 @@
+/**
+ * Summary: Header file for client-side response parsing and file saving utilities.
+ *
+ * @file c_http_parser.h
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #ifndef C_HTTP_PARSER_H
 #define C_HTTP_PARSER_H
 
-#define FILE_NAME_LEN /*32 too short*/ 256
+#define FILE_NAME_LEN 256
 #define BUFFER_SIZE 1024
 
 #include <stdio.h>
