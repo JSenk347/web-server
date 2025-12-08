@@ -4,32 +4,35 @@
 **Date**: November 2025 - December 2025
 
 ## Project Overview
-This project implements a lightweight, multi-threaded HTTP web server in C. It is designed to handle concurrent client connections efficiently using a thread pool architecture. The server parses HTTP GET requests, serves static files (HTML, CSS, JS, images), and returns appropriate HTTP status codes.
+This project implements a lightweight, multi-threaded HTTP web server in C. It is designed to handle concurrent client connections efficiently using a thread pool architecture. The server parses HTTP GET requests, serves static files (HTML, CSS, JS, images, PDFs), and returns appropriate HTTP status codes.
 
 The core objective is to demonstrate key operating system concepts, including:
 - **Multi-threading**: Utilizing POSIX threads (pthreads) for concurrent request processing.
-- **Synchronization**: employing mutexes and condition variables to manage a thread-safe producer-consumer request queue.
+- **Synchronization**: Employing mutexes and condition variables to manage a thread-safe producer-consumer request queue.
 - **Socket Programming**: Using the low-level socket API for TCP/IP networking.
 - **File I/O**: Efficiently reading and serving static resources.
 
 ## Features
-- **Concurrent Handling**: Uses a fixed-size thread pool to handle multiple client connections simultaneously without blocking the main listener thread.
-- **HTTP Parsing**: robustly parses HTTP GET requests to extract the method, path, and version.
-- **Static File Serving**: Supports serving a variety of file types (HTML, CSS, JavaScript, images) with correct MIME types.
+- **Concurrent Handling**: Uses a fixed-size thread pool (4 workers) to handle multiple client connections simultaneously without blocking the main listener thread.
+- **HTTP Parsing**: Robustly parses HTTP GET requests to extract the method, path, and version.
+- **Static File Serving**: Supports serving a variety of file types (HTML, CSS, JavaScript, images, PDF) with correct MIME types.
+- **Load Shedding**: **Automatically rejects connections when the queue (size 10) is full to prevent server overload.**
+- **Live Statistics Dashboard**: **Real-time monitor of Active Workers and Queue Size accessible at `/stats`.**
 - **Error Handling**: Returns standard HTTP status codes:
     - `200 OK`
     - `400 Bad Request` (for malformed requests)
     - `404 Not Found` (for missing files)
     - `500 Internal Server Error` (for server-side issues)
-- **Security**: Basic path traversal protection (blocks .. in paths).
+- **Security**: Basic path traversal protection (blocks `..` in paths).
 - **Logging**: Thread-safe logging of requests to the console.
 
 ## Architecture
 The server follows a **Producer-Consumer** model:
-1. **Main Thread (Producer)**: Listens on the specified port. When a client connects, it accepts the connection and enqueues the client socket descriptor into a thread-safe queue. 
+1. **Main Thread (Producer)**: Listens on the specified port. When a client connects, it accepts the connection and enqueues the client socket descriptor into a thread-safe queue.
 2. **Worker Threads (Consumers)**: A pool of worker threads waits for connections. When a socket is available, a worker dequeues it, reads the request, processes it, sends the response, and closes the connection.
+
 Synchronization is managed using:
-- `pthread_mutex_t` to protect the shared request queue and logging output.
+- `pthread_mutex_t` to protect the shared request queue, **global statistics counters**, and logging output.
 - `pthread_cond_t` to signal worker threads when a new connection is available.
 
 ## Build Instructions
