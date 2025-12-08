@@ -37,8 +37,15 @@ int main()
     // the "\r\n\r\n" sequence signals the end of the request header block.
     // client is only responsible for sending over bytes. server must parse message once recieved
     const char message[] =
-        //"GET www/HTTPSlides.png HTTP/1.1\r\n" the www should be handled on the server side ARR
-        "GET /shrek-rizz.gif HTTP/1.1\r\n"
+        "GET /index.html HTTP/1.1\r\n"
+        //"GET /shrek-rizz.gif HTTP/1.1\r\n"
+        // "GET /thomas.JPG HTTP/1.1\r\n"
+        // "GET /HTTPSlides.png HTTP/1.1\r\n"
+        //"GET /A6.pdf HTTP/1.1\r\n"                
+        // "GET /PP2_Concept_Memo.pdf HTTP/1.1\r\n"
+        // "GET /paintings-nested.json HTTP/1.1\r\n"
+        // "GET /api.js HTTP/1.1\r\n"
+        // "GET /product.css HTTP/1.1\r\n"
         "Host: 127.0.0.1:6767\r\n"
         "Connection: close\r\n"
         "\r\n";
