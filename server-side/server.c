@@ -1,3 +1,9 @@
+/**
+ * Summary: Main server entry point, responsible for socket creation, binding, listening, and the main accept loop.
+ *
+ * @file server.c
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #include "thread_pool.h"
 #include "http_parser.h"
 
@@ -10,6 +16,7 @@
 #define PORT 6767
 #define NUM_CONNECTIONS 5
 
+// --- FUNCTION DECLERATIONS ---
 int welcome_socket(uint16_t port);
 int create_socket(int *socketfd, int domain, int type);
 int set_socket_opt(int serverfd);
@@ -17,38 +24,39 @@ int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
                 socklen_t server_addr_len);
 int start_listening(int serverfd);
 
+// --- FUNCTIONS ---
 int main()
 {
-    // Prevent crashes if a client disconnects abruptly
+    // prevent crashes if a client disconnects abruptly
     signal(SIGPIPE, SIG_IGN);
 
-    // Start the Worker Threads
+    // start the worker threads
     thread_pool();
 
-    // Setup the Server Port
+    // setup the server port
     int serverfd = welcome_socket(PORT);
     if (serverfd < 0)
     {
         return -1;
     }
-    printf("Server listening on port %d...\n", PORT);
+    printf(" - ✔️ Server listening on port %d...\n", PORT);
 
-    // Accept -> Enqueue -> Repeat all day long
+    // accept -> enqueue -> repeat all day long
     struct sockaddr_in client_addr;
     socklen_t client_len = sizeof(client_addr);
 
     while (1)
     {
         int client_socket;
-        // Wait here until a client connects
+        // accept is a blocking function that will block until a client connects
         client_socket = accept(serverfd, (struct sockaddr *)&client_addr, &client_len);
 
         if (client_socket < 0)
         {
-            perror("Accept failed");
+            printf(" - ❌ Error: accept() failed\n");
             continue;
         }
-        // Send the ID to the queue
+        // send the ID to the queue
         enqueue(client_socket);
     }
 
@@ -89,14 +97,8 @@ int welcome_socket(uint16_t port)
         close(serverfd);
         return -1;
     }
-    // JD
-    // if (handle_client(serverfd, &server_addr, server_addr_len) < 0)
-    // {
-    //     close(serverfd);
-    //     return -1;
-    // }
 
-    return serverfd; // Returns the file descriptor of the socket
+    return serverfd; // file descriptor of the socket
 }
 
 /**
@@ -109,20 +111,20 @@ int welcome_socket(uint16_t port)
  */
 int create_socket(int *socketfd, int domain, int type)
 {
-    // Validate input pointer
+    // validate input pointer
     if (socketfd == NULL)
     {
-        fprintf(stderr, "Invalid pointer passed to create_wel_socket\n");
+        fprintf(stderr, " - ❌ Error: invalid pointer passed to create_wel_socket\n");
         return -1;
     }
 
-    // Create the socket
+    // create the socket
     *socketfd = socket(/*AF_INET*/ domain, /*SOCK_STREAM*/ type, 0);
 
-    // Error check socket creation failure
+    // error check socket creation failure
     if (*socketfd < 0)
     {
-        perror("\nwelcome socket creation failed");
+        perror(" - ❌ Error: welcome socket creation failed\n");
         return -1;
     }
 
@@ -137,13 +139,13 @@ int create_socket(int *socketfd, int domain, int type)
  */
 int set_socket_opt(int serverfd)
 {
-    // Set address/port reusable (optional, for quick restarts)
+    // set address/port reusable (optional, for quick restarts)
     int opt = 1;
 
     if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
     {
-        // Error check setsockopt failure
-        perror("\nsetsockopt failed");
+        // eror check setsockopt failure
+        perror(" - ❌ Error: setsockopt failed\n");
         return -1;
     }
     return 0;
@@ -162,17 +164,18 @@ int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
                 socklen_t server_addr_len)
 {
     /* wipes any garbo from the server_addr structure, filling &server_addr
-       with 0 for sizeof(server_addr) bytes */
+       with 0 for sizeof(server_addr) bytes 
+    */
     memset(server_addr, 0, server_addr_len);
 
-    server_addr->sin_family = AF_INET;         // Specifies the server address TYPE to IPv4
-    server_addr->sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces -> any of the machines IP addresses. INDADDR_ANY resolves to 0.0.0.0
-    server_addr->sin_port = htons(port);       // Set port number
+    server_addr->sin_family = AF_INET;         // specifies the server address TYPE to IPv4
+    server_addr->sin_addr.s_addr = INADDR_ANY; // listen on all interfaces -> any of the machines IP addresses. INDADDR_ANY resolves to 0.0.0.0
+    server_addr->sin_port = htons(port);       // set port number
 
-    // Bind the socket to the address and port -> reserves this port and IP addr for this socket
+    // bind the socket to the address and port -> reserves this port and IP addr for this socket
     if (bind(serverfd, (struct sockaddr *)server_addr, server_addr_len) < 0)
     {
-        perror("\nwelcome socket binding failed");
+        perror(" - ❌ Error: welcome socket binding failed");
         close(serverfd);
         return -1;
     }
@@ -187,10 +190,10 @@ int bind_socket(int serverfd, uint16_t port, struct sockaddr_in *server_addr,
  */
 int start_listening(int serverfd)
 {
-    // Listen for incoming connections (max 5 in the queue)
+    // listen for incoming connections
     if (listen(serverfd, NUM_CONNECTIONS) < 0)
     {
-        perror("welcome socket listening failed\n");
+        perror(" - ❌ Error: welcome socket listening failed\n");
         close(serverfd);
         return -1;
     }

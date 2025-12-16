@@ -1,3 +1,9 @@
+/**
+ * Summary: Header file exposing HTTP parsing functions, response generation, and MIME type handling.
+ *
+ * @file http_parser.h
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #ifndef HTTP_PARSER_H
 #define HTTP_PARSER_H
 

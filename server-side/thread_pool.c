@@ -1,3 +1,9 @@
+/**
+ * Summary: Implementation of the thread pool, task queue, and worker threads for concurrent request handling.
+ *
+ * @file thread_pool.c
+ * @authors: Anna Running Rabbit, Joseph Mills, Jordan Senko
+ */
 #include "thread_pool.h"
 #include "http_parser.h"
 #include "server.h"
@@ -6,9 +12,9 @@
 
 // --- THREADING GLOBALS ---
 pthread_t thread_pool_ids[NUM_THREADS];
-pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // The Lock
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;    // Logging Lock
-pthread_cond_t queue_cond_var = PTHREAD_COND_INITIALIZER; // The "Wake Up" Signal
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // queue mutex lock
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;    // logging mutex lock
+pthread_cond_t queue_cond_var = PTHREAD_COND_INITIALIZER; // thread "Wake Up" signal
 
 void thread_pool();
 void *worker_function(void *arg);
@@ -16,12 +22,14 @@ void enqueue(int client_socket);
 int dequeue();
 void log_request(int client_fd, char *method, const char *filepath, int status);
 
-//  Queue of client sockets, waiting for their requests to be serviced
-int socket_queue[MAX_SOCKETS]; // Queue of client file descriptors
+// queue of client sockets, waiting for their requests to be serviced
+int socket_queue[MAX_SOCKETS]; // queue of client file descriptors
 int queue_head = 0;
 int queue_tail = 0;
 int queue_count = 0;
 
+
+// --- FUNCTIONS ---
 /**
  * @brief Initializes the thread pool by creating worker threads.
  */
@@ -29,9 +37,7 @@ void thread_pool()
 {
     for (int i = 0; i < NUM_THREADS; i++)
     {
-        pthread_create(&thread_pool_ids[i], NULL, worker_function, NULL);
-        // printf("made a thread\n", NUM_THREADS);
-        // NUM_THREAD isn't doing anything without %d ? 
+        pthread_create(&thread_pool_ids[i], NULL, worker_function, NULL); 
     }
     printf("Thread pool initialized with %d workers.\n", NUM_THREADS);
 }
@@ -45,11 +51,12 @@ void *worker_function(void *arg)
 {
     while (1)
     {
-        // Get a client from the queue and sleep if empty
+        // get a client from the queue and sleep if empty
         int clientfd = dequeue();
+        //sleep(1); for testing
         char buffer[BUFFER_SIZE] = {0};
 
-        // We use recieve_message which calls handle_request
+        // we use recieve_message which calls handle_request
         receive_message(clientfd, buffer);
 
         close(clientfd);
@@ -64,30 +71,26 @@ void *worker_function(void *arg)
  */
 void enqueue(int client_socket)
 {
-    pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
+    pthread_mutex_lock(&queue_mutex); // thou shalt not access!
 
     //----CRITICAL SECTION: START----------------------------------------------
-    // Check if queue is full
-    if (queue_count < MAX_SOCKETS)
+    if (queue_count < MAX_SOCKETS) // check if queue is full
     {
-        socket_queue[queue_tail] = client_socket;    // Put ticket in buffer
-        queue_tail = (queue_tail + 1) % MAX_SOCKETS; // Move tail
+        socket_queue[queue_tail] = client_socket;    // put ticket in buffer
+        queue_tail = (queue_tail + 1) % MAX_SOCKETS; // move tail
         queue_count++;
 
-        // EYE SPY WITH MY LITTLE eye
-        printf("[Producer] Added Client %d to queue. (Queue Size: %d)\n", client_socket, queue_count);
-        // Wake up sleeping beauty (thread)
-        pthread_cond_signal(&queue_cond_var);
+        printf(" - [Producer] Enqueued client %d | Curr Queue Size: %d\n", client_socket, queue_count);
+        pthread_cond_signal(&queue_cond_var); // wake up sleeping beauty (thread)
     }
     else
     {
-        // Queue full
-        printf("Queue full! Dropping connection.\n");
+        printf(" - ⚠️ Warning: queue full! Dropping connection.\n");
         close(client_socket);
     }
     //----CRITICAL SECTION: END------------------------------------------------
 
-    pthread_mutex_unlock(&queue_mutex); // Unlock the door
+    pthread_mutex_unlock(&queue_mutex); // thou shall access
 }
 
 /**
@@ -97,37 +100,34 @@ void enqueue(int client_socket)
  */
 int dequeue()
 {
-    pthread_mutex_lock(&queue_mutex); // Thou shalt not unlock
+    pthread_mutex_lock(&queue_mutex); // thou shall not access
 
     //----CRITICAL SECTION: START----------------------------------------------
-    // Wait while queue is empty (Condition Variable)
-    while (queue_count == 0)
+    while (queue_count == 0) // wait while queue is empty
     {
-        // Sleep until signaled. Releases lock automatically while sleeping.
+        // sleep until signaled. releases lock when put to sleep.
         pthread_cond_wait(&queue_cond_var, &queue_mutex);
     }
 
-    // Woke up and have the lock! Take the item.
+    // thread has woken up and has the lock! take the item from the queue
     int client_socket = socket_queue[queue_head];
     queue_head = (queue_head + 1) % MAX_SOCKETS;
     queue_count--;
 
-    // EYE SPY WITH MY LITTLE eye
-    printf("  [Worker %lu] Dequeued Client %d. Queue Size Remaining: %d\n", pthread_self(), client_socket, queue_count);
+    printf("    - [Worker %lu] Dequeued client %d | Curr Queue Size: %d\n", pthread_self(), client_socket, queue_count);
     //----CRITICAL SECTION: END------------------------------------------------
 
-    pthread_mutex_unlock(&queue_mutex); // Unlock the door
+    pthread_mutex_unlock(&queue_mutex); // thou shall access
     return client_socket;
 }
 
 /**
- * @brief //TODO
+ * @brief Thread-safe logging of HTTP requests to the server console.
  *
- * @param client_fd
- * @param method
- * @param path
- * @param status
- *
+ * @param client_fd Socket file descriptor of the client being served
+ * @param method HTTP method used in the request (e.g., "GET")
+ * @param filepath Path of the requested resource
+ * @param status HTTP status code returned to the client (e.g., 200, 404, etc.)
  */
 void log_request(int client_fd, char *method, const char *filepath, int status)
 {
