@@ -53,6 +53,7 @@ void *worker_function(void *arg)
     {
         // get a client from the queue and sleep if empty
         int clientfd = dequeue();
+        //sleep(1); for testing
         char buffer[BUFFER_SIZE] = {0};
 
         // we use recieve_message which calls handle_request
